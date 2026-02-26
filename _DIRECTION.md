@@ -10,28 +10,26 @@
 - 참조: Coinbase(신뢰), 1Password(금고/보안), Linear(미니멀 다크)
 
 ## 현재 진행 상태
-- 완료: Phase 1 (프로젝트 구조 + 기본 세팅) -- commit 639b3b4
-- 진행중: Phase 2 (캐릭터/이미지) -- fal.ai 이미지 생성 + 텔레그램 전송 중
-- 진행중: Phase 3 (백엔드 API) -- Prisma 스키마, 라우트 구현, reputation/escrow/refund 서비스
-- 진행중: Phase 4 (프론트엔드) -- 랜딩 페이지, 컴포넌트 시스템, 핵심 페이지 UI
-- 대기: Phase 5 (DB+캐시), Phase 6 (외부 API), Phase 9 (배포), Phase 10 (마케팅)
+- 완료: Phase 1 (프로젝트 구조) -- commit 639b3b4
+- 완료: Phase 2 (캐릭터/이미지) -- 20개 브랜드 이미지, 파비콘, OG 이미지
+- 완료: Phase 3 (백엔드 API) -- Prisma 5테이블, 8개 라우트, 4개 핵심 서비스
+- 완료: Phase 4 (프론트엔드) -- 랜딩 + 5개 페이지, UI 컴포넌트, 반응형
+- 완료: Phase 5 (DB) -- PostgreSQL + Prisma 스키마, 인덱스 최적화
+- 완료: Phase 6 (외부 API) -- Helius, Jupiter, Solana RPC, Telegram 연동
+- 완료: Phase 9 (배포 설정) -- Vercel/Railway config, CI/CD pipeline
+- 완료: Phase 10 (마케팅) -- EN/KR 카피, 운영가이드, 위기 대응
+- 미해결: Anchor 빌드 (Rust 툴체인 호환성)
+- 대기: 실제 배포 (GitHub 리포 + 도메인 필요)
 
 ## 기술 결정사항
-- 프론트: Next.js 15.5.12 (App Router) + Tailwind CSS v4 + Three.js/R3F + zustand + Solana Wallet Adapter
+- 프론트: Next.js 15.5.12 (App Router) + Tailwind CSS v4 + zustand + Solana Wallet Adapter
 - 백엔드: Node.js + Express + TypeScript + Socket.io + BullMQ
-- DB: PostgreSQL (Railway addon)
-- 캐시: Redis (Railway addon)
-- 온체인: Anchor (Rust) + Metaplex + SPL Token/Token-2022
-- 외부 API: Helius DAS API, QuickNode (Geyser WebSocket), Jupiter (가격), Jito (번들 TX)
+- DB: PostgreSQL (Prisma ORM) + Redis 캐시
+- 온체인: Anchor (Rust) + SPL Token
+- 외부 API: Helius DAS, Jupiter Price, Solana RPC (QuickNode), Telegram Bot
 - 배포: Vercel (프론트) + Railway (백엔드 + DB + Redis)
-- 도메인: fyrst.fun 시도, 불가시 fyrst.xyz / fyrst.so
-- 차트: Lightweight Charts (TradingView)
-
-## 1차 후킹 (중간 임팩트)
-웹 대시보드 -- 활성 런칭 브라우징, 배포자 평판 조회, 토큰 안전도 스캔
-
-## 2차 후킹 (최대 임팩트 -- 클라이맥스)
-실제 토큰 런치패드 앱 -- 에스크로 담보 런칭, 본딩커브 거래, 자동 환불 메커니즘
+- CI/CD: GitHub Actions (lint + build)
+- 도메인: fyrst.fun
 
 ## 절대 변경 금지 사항
 - 배포자 담보 의무화 (에스크로 최소 1 SOL)
@@ -40,5 +38,9 @@
 - pump.fun 호환 bonding curve UX
 - $FYRST 토큰 티어 시스템 (Free/Basic/Pro/Elite/Whale)
 
-## 다음 할 일
-- Phase 1: Next.js 프론트 초기화 + Node.js 백엔드 초기화 + Git 설정
+## 다음 할 일 (수동 작업)
+1. GitHub PAT 토큰으로 gh auth login
+2. Cryptottat 계정에 fyrst 리포 생성 + push
+3. Vercel/Railway에 연결 + 환경변수 설정
+4. fyrst.fun 도메인 구매 + DNS 연결
+5. Anchor 빌드 문제 해결 (anchor-cli 업그레이드 or 툴체인 조정)

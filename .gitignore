@@ -35,7 +35,8 @@ npm-debug.log*
 .cache/
 .turbo/
 
-# Anchor
+# Anchor / Rust
+target/
 programs/target/
 .anchor/
 

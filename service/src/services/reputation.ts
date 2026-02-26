@@ -1,6 +1,7 @@
 import { ReputationRank, CollateralTier } from "../types";
 import { logger } from "../utils/logger";
 import { prisma, dbConnected } from "../lib/prisma";
+import { config } from "../config";
 
 // ---------------------------------------------------------------------------
 // Reputation scoring
@@ -94,6 +95,19 @@ export async function calculateReputationScore(
     if (!deployer) {
       return { score: 50, rank: ReputationRank.C };
     }
+
+    // TODO: When Helius API key is available, enrich reputation scoring with
+    // cross-wallet transaction history analysis. This would:
+    //   1. Call helius.getWalletHistory(deployerAddress) to fetch on-chain history
+    //   2. Call helius.getDeployerLaunches(deployerAddress) to find all past launches
+    //   3. Call helius.detectRugPull() for each past launch to detect rug patterns
+    //   4. Use the on-chain data to cross-reference and adjust the reputation input
+    // Example:
+    //   if (config.heliusApiKey) {
+    //     const { getDeployerLaunches, detectRugPull } = await import("./helius");
+    //     const launches = await getDeployerLaunches(deployerAddress);
+    //     // ... adjust totalLaunches, rugPulls, etc. based on on-chain data
+    //   }
 
     const score = computeScore({
       totalLaunches: deployer.totalLaunches,
