@@ -4,6 +4,7 @@ import { launchesRouter } from "./launches";
 import { deployerRouter } from "./deployer";
 import { tradeRouter } from "./trade";
 import { portfolioRouter } from "./portfolio";
+import { refundsRouter } from "./refunds";
 
 const router = Router();
 
@@ -12,5 +13,6 @@ router.use("/api/launches", launchesRouter);
 router.use("/api/deployer", deployerRouter);
 router.use("/api/trade", tradeRouter);
 router.use("/api/portfolio", portfolioRouter);
+router.use("/api/refunds", refundsRouter);
 
 export { router };

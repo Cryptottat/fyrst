@@ -1,0 +1,122 @@
+// ---------------------------------------------------------------------------
+// FYRST Prisma Schema
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Deployers
+// ---------------------------------------------------------------------------
+model Deployer {
+  address          String   @id @db.VarChar(64)
+  reputationScore  Int      @default(50) @map("reputation_score")
+  reputationRank   String   @default("C") @map("reputation_rank") @db.VarChar(1)
+  totalLaunches    Int      @default(0) @map("total_launches")
+  successfulLaunches Int    @default(0) @map("successful_launches")
+  rugPulls         Int      @default(0) @map("rug_pulls")
+  collateralLocked Float    @default(0) @map("collateral_locked")
+  collateralTier   String   @default("Bronze") @map("collateral_tier") @db.VarChar(10)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tokens Token[]
+
+  @@map("deployers")
+}
+
+// ---------------------------------------------------------------------------
+// Tokens
+// ---------------------------------------------------------------------------
+model Token {
+  mint                String   @id @db.VarChar(64)
+  name                String   @db.VarChar(64)
+  symbol              String   @db.VarChar(16)
+  description         String   @default("")
+  imageUrl            String   @default("") @map("image_url")
+  deployerAddress     String   @map("deployer_address") @db.VarChar(64)
+  marketCap           Float    @default(0) @map("market_cap")
+  currentPrice        Float    @default(0) @map("current_price")
+  totalSupply         Float    @default(0) @map("total_supply")
+  collateralTier      String   @default("Bronze") @map("collateral_tier") @db.VarChar(10)
+  graduated           Boolean  @default(false)
+  bondingCurveProgress Float   @default(0) @map("bonding_curve_progress")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  deployer     Deployer      @relation(fields: [deployerAddress], references: [address])
+  trades       Trade[]
+  refunds      Refund[]
+  buyerRecords BuyerRecord[]
+
+  @@index([deployerAddress])
+  @@index([createdAt])
+  @@index([marketCap])
+  @@map("tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Trades
+// ---------------------------------------------------------------------------
+model Trade {
+  id             String   @id @default(uuid())
+  tokenMint      String   @map("token_mint") @db.VarChar(64)
+  traderAddress  String   @map("trader_address") @db.VarChar(64)
+  side           String   @db.VarChar(4)  // buy or sell
+  amount         Float
+  price          Float
+  totalSol       Float    @map("total_sol")
+  txSignature    String   @default("") @map("tx_signature")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  token Token @relation(fields: [tokenMint], references: [mint])
+
+  @@index([tokenMint])
+  @@index([traderAddress])
+  @@index([createdAt])
+  @@map("trades")
+}
+
+// ---------------------------------------------------------------------------
+// Refunds
+// ---------------------------------------------------------------------------
+model Refund {
+  id               String    @id @default(uuid())
+  tokenMint        String    @map("token_mint") @db.VarChar(64)
+  claimantAddress  String    @map("claimant_address") @db.VarChar(64)
+  amountSol        Float     @map("amount_sol")
+  status           String    @default("pending") @db.VarChar(16) // pending | processing | completed | failed
+  txSignature      String?   @map("tx_signature")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  processedAt      DateTime? @map("processed_at")
+
+  token Token @relation(fields: [tokenMint], references: [mint])
+
+  @@index([tokenMint])
+  @@index([claimantAddress])
+  @@map("refunds")
+}
+
+// ---------------------------------------------------------------------------
+// Buyer Records (portfolio tracking)
+// ---------------------------------------------------------------------------
+model BuyerRecord {
+  id           String   @id @default(uuid())
+  buyerAddress String   @map("buyer_address") @db.VarChar(64)
+  tokenMint    String   @map("token_mint") @db.VarChar(64)
+  totalBought  Float    @default(0) @map("total_bought")
+  totalSold    Float    @default(0) @map("total_sold")
+  avgPrice     Float    @default(0) @map("avg_price")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  token Token @relation(fields: [tokenMint], references: [mint])
+
+  @@unique([buyerAddress, tokenMint])
+  @@index([buyerAddress])
+  @@map("buyer_records")
+}

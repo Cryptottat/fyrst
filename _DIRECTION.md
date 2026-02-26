@@ -10,11 +10,14 @@
 - 참조: Coinbase(신뢰), 1Password(금고/보안), Linear(미니멀 다크)
 
 ## 현재 진행 상태
-- 진행중: Phase 1 (프로젝트 구조 + 기본 세팅)
-- 대기: Phase 2 (캐릭터/이미지), Phase 3 (백엔드), Phase 4 (프론트), Phase 5~10
+- 완료: Phase 1 (프로젝트 구조 + 기본 세팅) -- commit 639b3b4
+- 진행중: Phase 2 (캐릭터/이미지) -- fal.ai 이미지 생성 + 텔레그램 전송 중
+- 진행중: Phase 3 (백엔드 API) -- Prisma 스키마, 라우트 구현, reputation/escrow/refund 서비스
+- 진행중: Phase 4 (프론트엔드) -- 랜딩 페이지, 컴포넌트 시스템, 핵심 페이지 UI
+- 대기: Phase 5 (DB+캐시), Phase 6 (외부 API), Phase 9 (배포), Phase 10 (마케팅)
 
 ## 기술 결정사항
-- 프론트: Next.js 15 (App Router) + Tailwind CSS v4 + Three.js/R3F + zustand + Solana Wallet Adapter
+- 프론트: Next.js 15.5.12 (App Router) + Tailwind CSS v4 + Three.js/R3F + zustand + Solana Wallet Adapter
 - 백엔드: Node.js + Express + TypeScript + Socket.io + BullMQ
 - DB: PostgreSQL (Railway addon)
 - 캐시: Redis (Railway addon)

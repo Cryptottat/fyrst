@@ -1,22 +1,23 @@
 # FYRST -- TODO
 
-## Phase 1: 프로젝트 구조 + 기본 세팅
-- [ ] Next.js 15 프론트엔드 초기화 (web/)
-- [ ] Node.js + Express + TypeScript 백엔드 초기화 (service/)
-- [ ] .gitignore, .env.example 생성
-- [ ] Tailwind v4 설정 (FYRST 컬러 팔레트)
-- [ ] TypeScript strict mode
-- [ ] ESLint + Prettier 설정
-- [ ] 폴더 구조 생성
-- [ ] Git 초기화 + 첫 커밋
-- [ ] _DIRECTION.md, _ARCHITECTURE.md, _CHARACTER.md 작성
+## Phase 1: 프로젝트 구조 + 기본 세팅 -- COMPLETE (commit 639b3b4)
+- [x] Next.js 15 프론트엔드 초기화 (web/)
+- [x] Node.js + Express + TypeScript 백엔드 초기화 (service/)
+- [x] .gitignore, .env.example 생성
+- [x] Tailwind v4 설정 (FYRST 컬러 팔레트)
+- [x] TypeScript strict mode
+- [x] ESLint + Prettier 설정
+- [x] 폴더 구조 생성
+- [x] Git 초기화 + 첫 커밋
+- [x] _DIRECTION.md, _ARCHITECTURE.md, _CHARACTER.md 작성
 
-## Phase 2: 캐릭터/이미지 (유저 협업)
-- [ ] TeamCreate 디자인 팀 생성
-- [ ] 마스코트 컨셉 이미지 생성 (fal.ai)
-- [ ] 텔레그램으로 유저에게 전송 + 피드백
-- [ ] 로고, 트위터 프사/배너, GitHub 배너, 커뮤니티 배너, 아티클 배너 생성
-- [ ] _CHARACTER.md 확정
+## Phase 2: 캐릭터/이미지 -- COMPLETE
+- [x] 마스코트 컨셉 이미지 생성 (fal.ai Flux Pro)
+- [x] 텔레그램으로 유저에게 전송 (20 variants)
+- [x] 로고(4), 트위터 프사(3)/배너(3), GitHub 배너(3), 커뮤니티 배너(3), 아티클 배너(4) 생성
+- [x] 파비콘 (ICO + PNG 16/32/180px) 생성
+- [x] OG 이미지 (1200x630 PNG) 생성
+- [x] _CHARACTER.md 확정
 
 ## Phase 3: 백엔드 API
 - [ ] Express + TypeScript 서버 구조

@@ -1,59 +1,145 @@
 import { BondingCurveState } from "../types";
 import { logger } from "../utils/logger";
+import { prisma, dbConnected } from "../lib/prisma";
+
+// ---------------------------------------------------------------------------
+// Bonding curve constants
+// ---------------------------------------------------------------------------
+
+const BASE_PRICE = 0.0001; // SOL per token at supply = 0
+const SLOPE = 0.00000001; // Price increase per unit of supply
+const GRADUATION_MARKET_CAP = 69_000; // SOL market cap to graduate (like pump.fun)
+
+// ---------------------------------------------------------------------------
+// Pure calculation helpers
+// ---------------------------------------------------------------------------
 
 /**
- * Calculate the price for a given token supply and purchase amount
- * using the bonding curve formula.
- *
- * FYRST uses a linear bonding curve: price = basePrice + slope * supply
- *
- * @param currentSupply - Current circulating supply of the token
- * @param purchaseAmount - Number of tokens being purchased
- * @returns Total cost in SOL for the purchase
+ * Spot price at a given supply level.
+ *   price = basePrice + slope * supply
  */
-export function calculatePrice(
+export function spotPrice(supply: number): number {
+  return BASE_PRICE + SLOPE * supply;
+}
+
+/**
+ * Cost to buy `amount` tokens starting from `currentSupply`.
+ * Uses integral of the linear bonding curve:
+ *   Cost = basePrice * amount + slope * (amount * currentSupply + amount^2 / 2)
+ */
+export function calculateBuyCost(
   currentSupply: number,
-  purchaseAmount: number
+  amount: number
 ): number {
-  // TODO: Implement bonding curve pricing formula
-  // Linear bonding curve: P(s) = base + slope * s
-  // Cost to buy N tokens from supply S:
-  //   integral from S to S+N of P(s) ds
-  //   = base * N + slope * (N * S + N^2 / 2)
-  logger.debug(
-    `Calculating price: supply=${currentSupply} amount=${purchaseAmount}`
-  );
-
-  const basePrice = 0.00001; // SOL per token at supply=0
-  const slope = 0.0000001; // Price increase per token
-
   const cost =
-    basePrice * purchaseAmount +
-    slope * (purchaseAmount * currentSupply + (purchaseAmount ** 2) / 2);
-
+    BASE_PRICE * amount +
+    SLOPE * (amount * currentSupply + (amount * amount) / 2);
   return cost;
 }
 
 /**
+ * SOL received when selling `amount` tokens starting from `currentSupply`.
+ * Integral runs from (supply - amount) to supply.
+ */
+export function calculateSellReturn(
+  currentSupply: number,
+  amount: number
+): number {
+  if (amount > currentSupply) {
+    throw new Error("Cannot sell more than current supply");
+  }
+  const newSupply = currentSupply - amount;
+  return calculateBuyCost(newSupply, amount);
+}
+
+/**
+ * Estimate slippage: percentage difference between spot price and effective
+ * average price for the given trade size.
+ */
+export function estimateSlippage(
+  currentSupply: number,
+  amount: number,
+  side: "buy" | "sell"
+): number {
+  const spot = spotPrice(currentSupply);
+  if (spot === 0) return 0;
+
+  let totalCost: number;
+  if (side === "buy") {
+    totalCost = calculateBuyCost(currentSupply, amount);
+  } else {
+    totalCost = calculateSellReturn(currentSupply, amount);
+  }
+  const avgPrice = totalCost / amount;
+  return Math.abs((avgPrice - spot) / spot) * 100; // percentage
+}
+
+/**
+ * Calculate the bonding curve progress towards graduation (0-100).
+ */
+export function calculateProgress(
+  currentSupply: number,
+  currentPrice: number
+): number {
+  const marketCap = currentSupply * currentPrice;
+  const progress = (marketCap / GRADUATION_MARKET_CAP) * 100;
+  return Math.min(100, progress);
+}
+
+// ---------------------------------------------------------------------------
+// Database-backed helpers
+// ---------------------------------------------------------------------------
+
+/**
  * Fetch the current state of a bonding curve for a given token.
- *
- * @param tokenMint - Token mint address
- * @returns Current bonding curve state
+ * If DB is unavailable, returns a mock zero-state.
  */
 export async function getBondingCurveState(
   tokenMint: string
 ): Promise<BondingCurveState> {
-  // TODO: Fetch bonding curve state from on-chain program
-  // 1. Derive bonding curve PDA from token mint
-  // 2. Fetch account data
-  // 3. Deserialize and return
   logger.info(`Fetching bonding curve state for token: ${tokenMint}`);
 
-  return {
-    tokenMint,
-    currentSupply: 0,
-    currentPrice: 0,
-    reserveBalance: 0,
-    graduated: false,
-  };
+  if (!dbConnected()) {
+    // TODO: In Phase 6 this will also query on-chain program accounts
+    return {
+      tokenMint,
+      currentSupply: 0,
+      currentPrice: BASE_PRICE,
+      reserveBalance: 0,
+      graduated: false,
+    };
+  }
+
+  try {
+    const token = await prisma.token.findUnique({
+      where: { mint: tokenMint },
+    });
+
+    if (!token) {
+      return {
+        tokenMint,
+        currentSupply: 0,
+        currentPrice: BASE_PRICE,
+        reserveBalance: 0,
+        graduated: false,
+      };
+    }
+
+    return {
+      tokenMint,
+      currentSupply: token.totalSupply,
+      currentPrice: token.currentPrice,
+      reserveBalance: token.marketCap, // reserve approximation
+      graduated: token.graduated,
+    };
+  } catch (err) {
+    logger.error("Failed to fetch bonding curve state", err);
+    return {
+      tokenMint,
+      currentSupply: 0,
+      currentPrice: BASE_PRICE,
+      reserveBalance: 0,
+      graduated: false,
+    };
+  }
 }

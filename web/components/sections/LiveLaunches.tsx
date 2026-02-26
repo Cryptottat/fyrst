@@ -1,0 +1,113 @@
+"use client";
+
+import Link from "next/link";
+import { motion } from "framer-motion";
+import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import ProgressBar from "@/components/ui/ProgressBar";
+import { mockTokens } from "@/lib/mockData";
+import {
+  formatCompact,
+  formatTimeAgo,
+  getReputationGrade,
+  getCollateralTier,
+} from "@/lib/utils";
+import type { Token } from "@/types";
+
+interface TokenCardProps {
+  token: Token;
+  index: number;
+}
+
+function TokenCard({ token, index }: TokenCardProps) {
+  const grade = getReputationGrade(token.reputationScore);
+  const tier = getCollateralTier(token.collateral);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: index * 0.08 }}
+    >
+      <Link href={`/token/${token.mint}`}>
+        <Card hover className="h-full">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-text-primary">
+                {token.name}
+              </h3>
+              <p className="text-sm font-mono text-text-muted">
+                ${token.symbol}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Badge label={grade} variant="reputation" />
+              <Badge label={tier} variant="collateral" />
+            </div>
+          </div>
+
+          <ProgressBar value={token.bondingCurveProgress} className="mb-4" />
+
+          <div className="flex items-center justify-between text-sm">
+            <div>
+              <span className="text-text-muted">MCap </span>
+              <span className="font-mono text-text-secondary">
+                ${formatCompact(token.marketCap)}
+              </span>
+            </div>
+            <span className="text-xs text-text-muted font-mono">
+              {formatTimeAgo(token.createdAt)}
+            </span>
+          </div>
+        </Card>
+      </Link>
+    </motion.div>
+  );
+}
+
+interface LiveLaunchesProps {
+  limit?: number;
+  showViewAll?: boolean;
+}
+
+export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaunchesProps) {
+  const tokens = mockTokens.slice(0, limit);
+
+  return (
+    <section className="py-24 px-6">
+      <div className="max-w-6xl mx-auto">
+        <motion.div
+          className="flex items-center justify-between mb-12"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div>
+            <h2 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">
+              Live Launches
+            </h2>
+            <p className="text-text-secondary">
+              Tokens currently in their bonding curve phase.
+            </p>
+          </div>
+          {showViewAll && (
+            <Link
+              href="/dashboard"
+              className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+            >
+              View All &rarr;
+            </Link>
+          )}
+        </motion.div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tokens.map((token, i) => (
+            <TokenCard key={token.mint} token={token} index={i} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
