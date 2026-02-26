@@ -1,33 +1,28 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
-import {
-  getDeployerByAddress,
-  getTokensByDeployer,
-} from "@/lib/mockData";
+import { fetchDeployer, type ApiDeployer } from "@/lib/api";
 import {
   formatAddress,
   formatCompact,
   formatTimeAgo,
   getReputationGrade,
-  getCollateralTier,
 } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 
 function ReputationGauge({ score }: { score: number }) {
   const grade = getReputationGrade(score);
-  const rotation = (score / 100) * 180 - 90; // -90 to 90 degrees
+  const rotation = (score / 100) * 180 - 90;
 
   return (
     <div className="flex flex-col items-center">
       <div className="relative w-40 h-20 overflow-hidden">
-        {/* Background arc */}
         <div className="absolute inset-0 rounded-t-full border-8 border-bg-elevated" />
-        {/* Colored arc overlay */}
         <div
           className="absolute inset-0 rounded-t-full border-8 border-transparent"
           style={{
@@ -46,7 +41,6 @@ function ReputationGauge({ score }: { score: number }) {
             borderRightColor: "transparent",
           }}
         />
-        {/* Needle */}
         <div
           className="absolute bottom-0 left-1/2 origin-bottom w-0.5 h-16 bg-text-primary rounded-full"
           style={{
@@ -54,7 +48,6 @@ function ReputationGauge({ score }: { score: number }) {
             transition: "transform 1s ease-out",
           }}
         />
-        {/* Center dot */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3 h-3 bg-text-primary rounded-full" />
       </div>
       <div className="mt-3 text-center">
@@ -74,10 +67,41 @@ export default function DeployerPage({
   params: Promise<{ address: string }>;
 }) {
   const { address } = use(params);
-  const deployer = getDeployerByAddress(address);
-  const tokens = getTokensByDeployer(address);
+  const [deployer, setDeployer] = useState<ApiDeployer | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!deployer) {
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetchDeployer(address)
+      .then((d) => {
+        if (!cancelled) {
+          setDeployer(d);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+          setLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [address]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-bg pt-24 pb-16 px-6 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </main>
+    );
+  }
+
+  if (error || !deployer) {
     return (
       <main className="min-h-screen bg-bg pt-24 pb-16 px-6 flex items-center justify-center">
         <div className="text-center">
@@ -96,11 +120,11 @@ export default function DeployerPage({
   }
 
   const grade = getReputationGrade(deployer.reputationScore);
+  const tokens = deployer.launchHistory ?? [];
 
   return (
     <main className="min-h-screen bg-bg pt-24 pb-16 px-6">
       <div className="max-w-4xl mx-auto">
-        {/* Profile header */}
         <div className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">
             Deployer Profile
@@ -111,12 +135,10 @@ export default function DeployerPage({
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-10">
-          {/* Reputation gauge */}
           <Card padding="lg" className="flex items-center justify-center">
             <ReputationGauge score={deployer.reputationScore} />
           </Card>
 
-          {/* Stats */}
           <Card padding="lg" className="md:col-span-2">
             <h3 className="text-sm font-semibold text-text-secondary mb-6">
               Statistics
@@ -125,24 +147,22 @@ export default function DeployerPage({
               <div>
                 <p className="text-xs text-text-muted mb-1">Past Launches</p>
                 <p className="text-2xl font-mono font-bold text-text-primary">
-                  {deployer.pastLaunches}
+                  {deployer.totalLaunches}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-text-muted mb-1">Rug Count</p>
                 <p
-                  className={`text-2xl font-mono font-bold ${deployer.rugCount > 0 ? "text-error" : "text-success"}`}
+                  className={`text-2xl font-mono font-bold ${deployer.rugPulls > 0 ? "text-error" : "text-success"}`}
                 >
-                  {deployer.rugCount}
+                  {deployer.rugPulls}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-text-muted mb-1">
-                  Avg Token Lifespan
-                </p>
+                <p className="text-xs text-text-muted mb-1">Collateral Locked</p>
                 <p className="text-2xl font-mono font-bold text-text-primary">
-                  {deployer.avgTokenLifespan}
-                  <span className="text-sm text-text-muted ml-1">days</span>
+                  {deployer.collateralLocked}
+                  <span className="text-sm text-text-muted ml-1">SOL</span>
                 </p>
               </div>
               <div>
@@ -166,44 +186,36 @@ export default function DeployerPage({
           </h2>
           {tokens.length > 0 ? (
             <div className="space-y-4">
-              {tokens.map((token) => {
-                const tokenGrade = getReputationGrade(token.reputationScore);
-                const tier = getCollateralTier(token.collateral);
-                return (
-                  <Link key={token.mint} href={`/token/${token.mint}`}>
-                    <Card
-                      hover
-                      className="flex flex-col sm:flex-row sm:items-center gap-4"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
-                          <h3 className="text-base font-semibold text-text-primary">
-                            {token.name}
-                          </h3>
-                          <span className="text-sm font-mono text-text-muted">
-                            ${token.symbol}
-                          </span>
-                        </div>
-                        <p className="text-xs text-text-muted">
-                          Launched {formatTimeAgo(token.createdAt)}
-                        </p>
+              {tokens.map((token) => (
+                <Link key={token.mint} href={`/token/${token.mint}`}>
+                  <Card
+                    hover
+                    className="flex flex-col sm:flex-row sm:items-center gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-base font-semibold text-text-primary">
+                          {token.name}
+                        </h3>
+                        <span className="text-sm font-mono text-text-muted">
+                          ${token.symbol}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <Badge label={tokenGrade} variant="reputation" />
-                        <Badge label={tier} variant="collateral" />
-                      </div>
-                      <div className="w-28 shrink-0">
-                        <ProgressBar value={token.bondingCurveProgress} />
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-mono text-text-primary">
-                          ${formatCompact(token.marketCap)}
-                        </p>
-                      </div>
-                    </Card>
-                  </Link>
-                );
-              })}
+                      <p className="text-xs text-text-muted">
+                        Launched {formatTimeAgo(token.createdAt)}
+                      </p>
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <ProgressBar value={token.bondingCurveProgress} />
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-mono text-text-primary">
+                        ${formatCompact(token.marketCap)}
+                      </p>
+                    </div>
+                  </Card>
+                </Link>
+              ))}
             </div>
           ) : (
             <div className="text-center py-12 text-text-muted">

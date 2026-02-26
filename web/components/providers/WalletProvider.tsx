@@ -17,7 +17,7 @@ interface Props {
 export default function WalletProvider({ children }: Props) {
   const endpoint = useMemo(
     () =>
-      process.env.NEXT_PUBLIC_SOLANA_RPC || clusterApiUrl("mainnet-beta"),
+      process.env.NEXT_PUBLIC_SOLANA_RPC || clusterApiUrl("devnet"),
     [],
   );
 

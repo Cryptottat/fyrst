@@ -1,0 +1,152 @@
+{
+  "version": "0.1.0",
+  "name": "fyrst",
+  "instructions": [
+    {
+      "name": "createEscrow",
+      "accounts": [
+        { "name": "deployer", "isMut": true, "isSigner": true },
+        { "name": "tokenMint", "isMut": false, "isSigner": false },
+        { "name": "escrowVault", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "collateralAmount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "releaseEscrow",
+      "accounts": [
+        { "name": "deployer", "isMut": true, "isSigner": true },
+        { "name": "escrowVault", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "initBondingCurve",
+      "accounts": [
+        { "name": "deployer", "isMut": true, "isSigner": true },
+        { "name": "tokenMint", "isMut": false, "isSigner": false },
+        { "name": "bondingCurve", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "basePrice", "type": "u64" },
+        { "name": "slope", "type": "u64" }
+      ]
+    },
+    {
+      "name": "buyTokens",
+      "accounts": [
+        { "name": "buyer", "isMut": true, "isSigner": true },
+        { "name": "bondingCurve", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "solAmount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "sellTokens",
+      "accounts": [
+        { "name": "seller", "isMut": true, "isSigner": true },
+        { "name": "bondingCurve", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "tokenAmount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "recordBuyer",
+      "accounts": [
+        { "name": "buyer", "isMut": true, "isSigner": true },
+        { "name": "tokenMint", "isMut": false, "isSigner": false },
+        { "name": "buyerRecord", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "amount", "type": "u64" },
+        { "name": "price", "type": "u64" }
+      ]
+    },
+    {
+      "name": "processRefund",
+      "accounts": [
+        { "name": "authority", "isMut": false, "isSigner": true },
+        { "name": "buyer", "isMut": true, "isSigner": false },
+        { "name": "escrowVault", "isMut": true, "isSigner": false },
+        { "name": "buyerRecord", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "EscrowVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "deployer", "type": "publicKey" },
+          { "name": "tokenMint", "type": "publicKey" },
+          { "name": "collateralAmount", "type": "u64" },
+          { "name": "createdAt", "type": "i64" },
+          { "name": "released", "type": "bool" },
+          { "name": "rugged", "type": "bool" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "BondingCurve",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "tokenMint", "type": "publicKey" },
+          { "name": "currentSupply", "type": "u64" },
+          { "name": "basePrice", "type": "u64" },
+          { "name": "slope", "type": "u64" },
+          { "name": "reserveBalance", "type": "u64" },
+          { "name": "graduated", "type": "bool" },
+          { "name": "deployer", "type": "publicKey" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "BuyerRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "buyer", "type": "publicKey" },
+          { "name": "tokenMint", "type": "publicKey" },
+          { "name": "totalBought", "type": "u64" },
+          { "name": "totalSolSpent", "type": "u64" },
+          { "name": "avgPrice", "type": "u64" },
+          { "name": "refundClaimed", "type": "bool" },
+          { "name": "firstBuyAt", "type": "i64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "InsufficientCollateral", "msg": "Collateral amount is below minimum (1 SOL)" },
+    { "code": 6001, "name": "SafePeriodActive", "msg": "Safe period has not ended yet" },
+    { "code": 6002, "name": "SafePeriodExpired", "msg": "Safe period has already ended" },
+    { "code": 6003, "name": "Unauthorized", "msg": "Unauthorized: not the escrow owner" },
+    { "code": 6004, "name": "EscrowAlreadyReleased", "msg": "Escrow is already released" },
+    { "code": 6005, "name": "InsufficientFunds", "msg": "Insufficient SOL for purchase" },
+    { "code": 6006, "name": "InsufficientTokens", "msg": "Insufficient tokens for sale" },
+    { "code": 6007, "name": "AlreadyGraduated", "msg": "Bonding curve already graduated" },
+    { "code": 6008, "name": "RefundAlreadyProcessed", "msg": "Refund already processed" },
+    { "code": 6009, "name": "NoBuyerRecord", "msg": "No buyer record found" },
+    { "code": 6010, "name": "MathOverflow", "msg": "Math overflow" },
+    { "code": 6011, "name": "InvalidPrice", "msg": "Invalid price calculation" }
+  ],
+  "metadata": {
+    "address": "CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP"
+  }
+}

@@ -11,12 +11,15 @@ const solanaAddress = z.string().min(32).max(64);
 // ---------------------------------------------------------------------------
 
 export const createLaunchSchema = z.object({
+  mint: solanaAddress,
   name: z.string().min(1).max(64),
   symbol: z.string().min(1).max(16).transform((s) => s.toUpperCase()),
   description: z.string().max(500).default(""),
   imageUrl: z.string().url().or(z.literal("")).default(""),
   deployerAddress: solanaAddress,
   collateralAmount: z.number().min(1, "Minimum collateral is 1 SOL"),
+  escrowTxSignature: z.string().min(32).optional(),
+  curveTxSignature: z.string().min(32).optional(),
 });
 
 export type CreateLaunchInput = z.infer<typeof createLaunchSchema>;
@@ -42,6 +45,9 @@ export const createTradeSchema = z.object({
   traderAddress: solanaAddress,
   side: z.enum(["buy", "sell"]),
   amount: z.number().positive("Amount must be positive"),
+  txSignature: z.string().min(32).optional(),
+  solAmount: z.number().positive().optional(),
+  price: z.number().nonnegative().optional(),
 });
 
 export type CreateTradeInput = z.infer<typeof createTradeSchema>;

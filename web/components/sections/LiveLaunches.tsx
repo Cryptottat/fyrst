@@ -1,27 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { mockTokens } from "@/lib/mockData";
+import { fetchLaunches, type ApiToken } from "@/lib/api";
 import {
   formatCompact,
   formatTimeAgo,
   getReputationGrade,
-  getCollateralTier,
 } from "@/lib/utils";
-import type { Token } from "@/types";
+import { Loader2 } from "lucide-react";
 
 interface TokenCardProps {
-  token: Token;
+  token: ApiToken;
   index: number;
 }
 
 function TokenCard({ token, index }: TokenCardProps) {
-  const grade = getReputationGrade(token.reputationScore);
-  const tier = getCollateralTier(token.collateral);
+  const score = token.deployer?.reputationScore ?? 50;
+  const grade = getReputationGrade(score);
+  const tier = token.collateralTier || "Bronze";
 
   return (
     <motion.div
@@ -72,7 +73,19 @@ interface LiveLaunchesProps {
 }
 
 export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaunchesProps) {
-  const tokens = mockTokens.slice(0, limit);
+  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLaunches("newest", limit, 0)
+      .then((result) => {
+        setTokens(result.tokens);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
+  }, [limit]);
 
   return (
     <section className="py-24 px-6">
@@ -102,11 +115,22 @@ export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaun
           )}
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tokens.map((token, i) => (
-            <TokenCard key={token.mint} token={token} index={i} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-text-muted">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            Loading...
+          </div>
+        ) : tokens.length > 0 ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tokens.map((token, i) => (
+              <TokenCard key={token.mint} token={token} index={i} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 text-text-muted">
+            No launches yet. Be the first to launch a token!
+          </div>
+        )}
       </div>
     </section>
   );

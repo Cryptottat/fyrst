@@ -1,25 +1,34 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { mockTokens } from "@/lib/mockData";
+import { fetchLaunches, type ApiToken } from "@/lib/api";
 import {
   formatCompact,
   formatTimeAgo,
   getReputationGrade,
   getCollateralTier,
 } from "@/lib/utils";
-import { Search } from "lucide-react";
-import type { Token } from "@/types";
+import { Search, Loader2 } from "lucide-react";
 
 type SortKey = "newest" | "marketCap" | "reputation";
 
-function TokenRow({ token }: { token: Token }) {
-  const grade = getReputationGrade(token.reputationScore);
-  const tier = getCollateralTier(token.collateral);
+function collateralToSol(tier: string): number {
+  switch (tier) {
+    case "Diamond": return 25;
+    case "Gold": return 10;
+    case "Silver": return 5;
+    default: return 1;
+  }
+}
+
+function TokenRow({ token }: { token: ApiToken }) {
+  const score = token.deployer?.reputationScore ?? 50;
+  const grade = getReputationGrade(score);
+  const tier = token.collateralTier || "Bronze";
 
   return (
     <Link href={`/token/${token.mint}`}>
@@ -63,38 +72,41 @@ function TokenRow({ token }: { token: Token }) {
 export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
+  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetchLaunches(sort === "marketCap" ? "marketcap" : sort, 50, 0)
+      .then((result) => {
+        if (!cancelled) {
+          setTokens(result.tokens);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message);
+          setLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [sort]);
 
   const filtered = useMemo(() => {
-    let tokens = [...mockTokens];
-
-    // Filter by search
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      tokens = tokens.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) ||
-          t.symbol.toLowerCase().includes(q),
-      );
-    }
-
-    // Sort
-    switch (sort) {
-      case "newest":
-        tokens.sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        );
-        break;
-      case "marketCap":
-        tokens.sort((a, b) => b.marketCap - a.marketCap);
-        break;
-      case "reputation":
-        tokens.sort((a, b) => b.reputationScore - a.reputationScore);
-        break;
-    }
-
-    return tokens;
-  }, [search, sort]);
+    if (!search.trim()) return tokens;
+    const q = search.toLowerCase();
+    return tokens.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.symbol.toLowerCase().includes(q),
+    );
+  }, [search, tokens]);
 
   return (
     <main className="min-h-screen bg-bg pt-24 pb-16 px-6">
@@ -148,13 +160,25 @@ export default function DashboardPage() {
 
         {/* Token list */}
         <div className="space-y-4">
-          {filtered.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-text-muted">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              Loading launches...
+            </div>
+          ) : error ? (
+            <div className="text-center py-16">
+              <p className="text-error mb-2">Failed to load launches</p>
+              <p className="text-text-muted text-sm">{error}</p>
+            </div>
+          ) : filtered.length > 0 ? (
             filtered.map((token) => (
               <TokenRow key={token.mint} token={token} />
             ))
           ) : (
             <div className="text-center py-16 text-text-muted">
-              No tokens match your search.
+              {search.trim()
+                ? "No tokens match your search."
+                : "No tokens launched yet. Be the first!"}
             </div>
           )}
         </div>

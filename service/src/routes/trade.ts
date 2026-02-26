@@ -23,11 +23,14 @@ tradeRouter.post(
   validateBody(createTradeSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { tokenMint, traderAddress, side, amount } = req.body as {
+      const { tokenMint, traderAddress, side, amount, txSignature: clientTxSig, solAmount: clientSolAmount, price: clientPrice } = req.body as {
         tokenMint: string;
         traderAddress: string;
         side: "buy" | "sell";
         amount: number;
+        txSignature?: string;
+        solAmount?: number;
+        price?: number;
       };
 
       // ----- Mock mode -----
@@ -118,8 +121,8 @@ tradeRouter.post(
       const progress = calculateProgress(newSupply, newPrice);
       const graduated = progress >= 100;
 
-      // TODO (Phase 6): Execute actual Solana swap transaction here
-      const txSignature = `tx_${side}_${Date.now()}`;
+      // Use client-provided TX signature from on-chain trade, fallback to mock
+      const txSignature = clientTxSig || `tx_${side}_${Date.now()}`;
 
       // Record trade
       const trade = await prisma.trade.create({

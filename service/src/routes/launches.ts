@@ -228,12 +228,15 @@ launchesRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const {
+        mint: clientMint,
         name,
         symbol,
         description,
         imageUrl,
         deployerAddress,
         collateralAmount,
+        escrowTxSignature,
+        curveTxSignature,
       } = req.body;
 
       // Validate collateral
@@ -247,8 +250,8 @@ launchesRouter.post(
       }
 
       const tier = assignTier(collateralAmount);
-      // Generate a mock mint address (in Phase 6 this comes from on-chain token creation)
-      const mint = `mint_${uuidv4().replace(/-/g, "").slice(0, 32)}`;
+      // Use client-provided mint from on-chain TX, fallback to generated
+      const mint = clientMint || `mint_${uuidv4().replace(/-/g, "").slice(0, 32)}`;
 
       if (!dbConnected()) {
         const mockToken = {

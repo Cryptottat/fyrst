@@ -1,8 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
+
+const VaultScene = dynamic(() => import("@/components/three/VaultScene"), {
+  ssr: false,
+  loading: () => null,
+});
 
 function FloatingParticle({ delay, x, y, size }: { delay: number; x: string; y: string; size: number }) {
   return (
@@ -23,9 +30,42 @@ function FloatingParticle({ delay, x, y, size }: { delay: number; x: string; y: 
   );
 }
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const onChange = () => setIsMobile(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 export default function Hero() {
+  const isMobile = useIsMobile();
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* 3D Vault Scene (desktop) or gradient fallback (mobile) */}
+      {isMobile ? (
+        /* Static gradient fallback for mobile */
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse at 50% 40%, rgba(37,99,235,0.18) 0%, rgba(217,119,6,0.06) 40%, transparent 70%)",
+          }}
+        />
+      ) : (
+        /* 3D scene — pointer-events-none so it never blocks clicks */
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <VaultScene />
+        </div>
+      )}
+
       {/* Blueprint grid background */}
       <div
         className="absolute inset-0 opacity-[0.04]"
