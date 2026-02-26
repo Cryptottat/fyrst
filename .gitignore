@@ -42,3 +42,5 @@ programs/target/
 
 # Guide (development only)
 new_project_guide/
+.vercel
+test-ledger/

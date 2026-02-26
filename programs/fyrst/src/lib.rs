@@ -7,7 +7,7 @@ pub mod constants;
 
 use instructions::*;
 
-declare_id!("7HRkCWJt4DXZ2tfomHZufdS6j97RdHiLZHbdnY4mensH");
+declare_id!("CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP");
 
 #[program]
 pub mod fyrst {

@@ -6,13 +6,16 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-fyrst = "7HRkCWJt4DXZ2tfomHZufdS6j97RdHiLZHbdnY4mensH"
+fyrst = "CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP"
+
+[programs.devnet]
+fyrst = "CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
