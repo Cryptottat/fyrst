@@ -80,7 +80,7 @@
 - [x] Escrow 명령어 (create/release)
 - [x] Bonding curve 명령어 (init/buy/sell)
 - [x] Refund 명령어 (record_buyer/process_refund)
-- [ ] anchor build 통과 (Rust 툴체인 호환성 문제)
+- [x] anchor build 통과 (Agave v2.2.12 + borrow fix -- fyrst.so 302KB)
 
 ## 남은 수동 작업
 - [ ] GitHub PAT 토큰으로 gh auth login

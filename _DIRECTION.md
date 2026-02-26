@@ -18,7 +18,7 @@
 - 완료: Phase 6 (외부 API) -- Helius, Jupiter, Solana RPC, Telegram 연동
 - 완료: Phase 9 (배포 설정) -- Vercel/Railway config, CI/CD pipeline
 - 완료: Phase 10 (마케팅) -- EN/KR 카피, 운영가이드, 위기 대응
-- 미해결: Anchor 빌드 (Rust 툴체인 호환성)
+- 완료: Anchor 빌드 (Agave v2.2.12, fyrst.so 302KB)
 - 대기: 실제 배포 (GitHub 리포 + 도메인 필요)
 
 ## 기술 결정사항
@@ -43,4 +43,4 @@
 2. Cryptottat 계정에 fyrst 리포 생성 + push
 3. Vercel/Railway에 연결 + 환경변수 설정
 4. fyrst.fun 도메인 구매 + DNS 연결
-5. Anchor 빌드 문제 해결 (anchor-cli 업그레이드 or 툴체인 조정)
+5. Solana devnet 배포 테스트 (anchor deploy)
