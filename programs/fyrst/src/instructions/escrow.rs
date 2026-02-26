@@ -11,16 +11,7 @@ pub fn create_escrow(ctx: Context<CreateEscrow>, collateral_amount: u64) -> Resu
         FyrstError::InsufficientCollateral
     );
 
-    let escrow = &mut ctx.accounts.escrow_vault;
-    escrow.deployer = ctx.accounts.deployer.key();
-    escrow.token_mint = ctx.accounts.token_mint.key();
-    escrow.collateral_amount = collateral_amount;
-    escrow.created_at = Clock::get()?.unix_timestamp;
-    escrow.released = false;
-    escrow.rugged = false;
-    escrow.bump = ctx.bumps.escrow_vault;
-
-    // Transfer SOL from deployer to escrow PDA
+    // Transfer SOL from deployer to escrow PDA (before mutable borrow)
     system_program::transfer(
         CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
@@ -31,6 +22,15 @@ pub fn create_escrow(ctx: Context<CreateEscrow>, collateral_amount: u64) -> Resu
         ),
         collateral_amount,
     )?;
+
+    let escrow = &mut ctx.accounts.escrow_vault;
+    escrow.deployer = ctx.accounts.deployer.key();
+    escrow.token_mint = ctx.accounts.token_mint.key();
+    escrow.collateral_amount = collateral_amount;
+    escrow.created_at = Clock::get()?.unix_timestamp;
+    escrow.released = false;
+    escrow.rugged = false;
+    escrow.bump = ctx.bumps.escrow_vault;
 
     msg!(
         "Escrow created: deployer={}, mint={}, collateral={}",
@@ -44,30 +44,35 @@ pub fn create_escrow(ctx: Context<CreateEscrow>, collateral_amount: u64) -> Resu
 
 /// Release escrow back to deployer after safe period
 pub fn release_escrow(ctx: Context<ReleaseEscrow>) -> Result<()> {
-    let escrow = &mut ctx.accounts.escrow_vault;
+    let amount;
+    let deployer_key;
+    {
+        let escrow = &mut ctx.accounts.escrow_vault;
 
-    require!(!escrow.released, FyrstError::EscrowAlreadyReleased);
-    require!(
-        ctx.accounts.deployer.key() == escrow.deployer,
-        FyrstError::Unauthorized
-    );
+        require!(!escrow.released, FyrstError::EscrowAlreadyReleased);
+        require!(
+            ctx.accounts.deployer.key() == escrow.deployer,
+            FyrstError::Unauthorized
+        );
 
-    let now = Clock::get()?.unix_timestamp;
-    require!(
-        now >= escrow.created_at + SAFE_PERIOD,
-        FyrstError::SafePeriodActive
-    );
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            now >= escrow.created_at + SAFE_PERIOD,
+            FyrstError::SafePeriodActive
+        );
 
-    escrow.released = true;
+        escrow.released = true;
+        amount = escrow.collateral_amount;
+        deployer_key = escrow.deployer;
+    }
 
-    // Transfer SOL back to deployer from escrow PDA
-    let amount = escrow.collateral_amount;
+    // Transfer SOL back to deployer from escrow PDA (after mutable borrow is dropped)
     **ctx.accounts.escrow_vault.to_account_info().try_borrow_mut_lamports()? -= amount;
     **ctx.accounts.deployer.to_account_info().try_borrow_mut_lamports()? += amount;
 
     msg!(
         "Escrow released: deployer={}, amount={}",
-        escrow.deployer,
+        deployer_key,
         amount
     );
 

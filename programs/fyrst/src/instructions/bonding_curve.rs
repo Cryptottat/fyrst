@@ -32,39 +32,44 @@ pub fn init_bonding_curve(
 
 /// Buy tokens on the bonding curve
 pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
-    let curve = &mut ctx.accounts.bonding_curve;
+    // Read curve state for calculations (immutable borrow)
+    let current_price;
+    let tokens;
+    let net_sol;
+    {
+        let curve = &ctx.accounts.bonding_curve;
 
-    require!(!curve.graduated, FyrstError::AlreadyGraduated);
-    require!(sol_amount > 0, FyrstError::InsufficientFunds);
+        require!(!curve.graduated, FyrstError::AlreadyGraduated);
+        require!(sol_amount > 0, FyrstError::InsufficientFunds);
 
-    // Calculate tokens to receive: price = base_price + slope * current_supply
-    // For a linear curve: tokens = sol_amount / current_price (simplified)
-    let current_price = curve
-        .base_price
-        .checked_add(
-            curve.slope.checked_mul(curve.current_supply).ok_or(FyrstError::MathOverflow)?,
-        )
-        .ok_or(FyrstError::MathOverflow)?;
+        // Calculate tokens to receive: price = base_price + slope * current_supply
+        current_price = curve
+            .base_price
+            .checked_add(
+                curve.slope.checked_mul(curve.current_supply).ok_or(FyrstError::MathOverflow)?,
+            )
+            .ok_or(FyrstError::MathOverflow)?;
 
-    require!(current_price > 0, FyrstError::InvalidPrice);
+        require!(current_price > 0, FyrstError::InvalidPrice);
 
-    // Apply trade fee
-    let fee = sol_amount
-        .checked_mul(TRADE_FEE_BPS)
-        .ok_or(FyrstError::MathOverflow)?
-        .checked_div(BPS_DENOMINATOR)
-        .ok_or(FyrstError::MathOverflow)?;
+        // Apply trade fee
+        let fee = sol_amount
+            .checked_mul(TRADE_FEE_BPS)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(BPS_DENOMINATOR)
+            .ok_or(FyrstError::MathOverflow)?;
 
-    let net_sol = sol_amount.checked_sub(fee).ok_or(FyrstError::MathOverflow)?;
+        net_sol = sol_amount.checked_sub(fee).ok_or(FyrstError::MathOverflow)?;
 
-    // tokens = net_sol * 1e9 / current_price (to maintain precision)
-    let tokens = net_sol
-        .checked_mul(1_000_000_000)
-        .ok_or(FyrstError::MathOverflow)?
-        .checked_div(current_price)
-        .ok_or(FyrstError::MathOverflow)?;
+        // tokens = net_sol * 1e9 / current_price (to maintain precision)
+        tokens = net_sol
+            .checked_mul(1_000_000_000)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(current_price)
+            .ok_or(FyrstError::MathOverflow)?;
+    }
 
-    // Transfer SOL from buyer to curve PDA
+    // Transfer SOL from buyer to curve PDA (no conflicting borrows)
     system_program::transfer(
         CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
@@ -76,7 +81,8 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
         sol_amount,
     )?;
 
-    // Update curve state
+    // Update curve state (mutable borrow)
+    let curve = &mut ctx.accounts.bonding_curve;
     curve.current_supply = curve
         .current_supply
         .checked_add(tokens)
@@ -99,48 +105,53 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
 
 /// Sell tokens on the bonding curve
 pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64) -> Result<()> {
-    let curve = &mut ctx.accounts.bonding_curve;
+    // Read curve state for calculations and validation (immutable borrow)
+    let net_sol;
+    {
+        let curve = &ctx.accounts.bonding_curve;
 
-    require!(!curve.graduated, FyrstError::AlreadyGraduated);
-    require!(token_amount > 0, FyrstError::InsufficientTokens);
-    require!(
-        curve.current_supply >= token_amount,
-        FyrstError::InsufficientTokens
-    );
+        require!(!curve.graduated, FyrstError::AlreadyGraduated);
+        require!(token_amount > 0, FyrstError::InsufficientTokens);
+        require!(
+            curve.current_supply >= token_amount,
+            FyrstError::InsufficientTokens
+        );
 
-    // Calculate SOL to return
-    let current_price = curve
-        .base_price
-        .checked_add(
-            curve.slope.checked_mul(curve.current_supply).ok_or(FyrstError::MathOverflow)?,
-        )
-        .ok_or(FyrstError::MathOverflow)?;
+        // Calculate SOL to return
+        let current_price = curve
+            .base_price
+            .checked_add(
+                curve.slope.checked_mul(curve.current_supply).ok_or(FyrstError::MathOverflow)?,
+            )
+            .ok_or(FyrstError::MathOverflow)?;
 
-    let gross_sol = token_amount
-        .checked_mul(current_price)
-        .ok_or(FyrstError::MathOverflow)?
-        .checked_div(1_000_000_000)
-        .ok_or(FyrstError::MathOverflow)?;
+        let gross_sol = token_amount
+            .checked_mul(current_price)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(1_000_000_000)
+            .ok_or(FyrstError::MathOverflow)?;
 
-    // Apply trade fee
-    let fee = gross_sol
-        .checked_mul(TRADE_FEE_BPS)
-        .ok_or(FyrstError::MathOverflow)?
-        .checked_div(BPS_DENOMINATOR)
-        .ok_or(FyrstError::MathOverflow)?;
+        // Apply trade fee
+        let fee = gross_sol
+            .checked_mul(TRADE_FEE_BPS)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(BPS_DENOMINATOR)
+            .ok_or(FyrstError::MathOverflow)?;
 
-    let net_sol = gross_sol.checked_sub(fee).ok_or(FyrstError::MathOverflow)?;
+        net_sol = gross_sol.checked_sub(fee).ok_or(FyrstError::MathOverflow)?;
 
-    require!(
-        curve.reserve_balance >= net_sol,
-        FyrstError::InsufficientFunds
-    );
+        require!(
+            curve.reserve_balance >= net_sol,
+            FyrstError::InsufficientFunds
+        );
+    }
 
-    // Transfer SOL from curve PDA to seller
+    // Transfer SOL from curve PDA to seller (no conflicting borrows)
     **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= net_sol;
     **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += net_sol;
 
-    // Update curve state
+    // Update curve state (mutable borrow)
+    let curve = &mut ctx.accounts.bonding_curve;
     curve.current_supply = curve
         .current_supply
         .checked_sub(token_amount)
