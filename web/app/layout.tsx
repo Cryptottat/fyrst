@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import WalletProvider from "@/components/providers/WalletProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,9 +33,11 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-bg text-text-primary`}
       >
-        <Header />
-        <div className="min-h-screen">{children}</div>
-        <Footer />
+        <WalletProvider>
+          <Header />
+          <div className="min-h-screen">{children}</div>
+          <Footer />
+        </WalletProvider>
       </body>
     </html>
   );

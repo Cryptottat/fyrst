@@ -1,11 +1,12 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
+import BondingCurveChart from "@/components/charts/BondingCurveChart";
 import { getTokenByMint, getDeployerByAddress } from "@/lib/mockData";
 import {
   formatSol,
@@ -27,6 +28,25 @@ export default function TokenDetailPage({
 
   const [buyAmount, setBuyAmount] = useState("");
   const [sellAmount, setSellAmount] = useState("");
+
+  // Generate mock trade data for the chart
+  const mockTrades = useMemo(() => {
+    if (!token) return [];
+    const now = Math.floor(Date.now() / 1000);
+    const trades: { time: number; price: number; volume: number }[] = [];
+    let price = token.marketCap / 1_000_000; // approximate starting price
+    for (let i = 0; i < 50; i++) {
+      const time = now - (50 - i) * 300; // 5-minute intervals
+      const change = (Math.random() - 0.45) * price * 0.08;
+      price = Math.max(price * 0.5, price + change);
+      trades.push({
+        time,
+        price: parseFloat(price.toFixed(6)),
+        volume: Math.random() * 100,
+      });
+    }
+    return trades;
+  }, [token]);
 
   if (!token) {
     return (
@@ -86,16 +106,19 @@ export default function TokenDetailPage({
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left column - chart + info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Chart placeholder */}
+            {/* Price chart */}
             <Card padding="lg">
               <h3 className="text-sm font-semibold text-text-secondary mb-4">
                 Price Chart
               </h3>
-              <div className="w-full h-64 bg-bg rounded-lg border border-border flex items-center justify-center">
-                <p className="text-text-muted text-sm font-mono">
-                  Chart coming soon
-                </p>
-              </div>
+              <BondingCurveChart
+                trades={mockTrades}
+                currentPrice={
+                  mockTrades.length > 0
+                    ? mockTrades[mockTrades.length - 1].price
+                    : 0
+                }
+              />
             </Card>
 
             {/* Stats */}

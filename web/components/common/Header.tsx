@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import Button from "@/components/ui/Button";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
@@ -56,9 +56,17 @@ export default function Header() {
 
         {/* Right side */}
         <div className="hidden md:block">
-          <Button variant="outline" size="sm">
-            Connect Wallet
-          </Button>
+          <WalletMultiButton
+            style={{
+              backgroundColor: "#2563EB",
+              color: "#F8FAFC",
+              fontFamily: "inherit",
+              fontSize: "0.875rem",
+              height: "2.25rem",
+              borderRadius: "0.5rem",
+              padding: "0 1rem",
+            }}
+          />
         </div>
 
         {/* Mobile menu toggle */}
@@ -85,9 +93,18 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
-            <Button variant="outline" size="sm" className="w-fit">
-              Connect Wallet
-            </Button>
+            <WalletMultiButton
+              style={{
+                backgroundColor: "#2563EB",
+                color: "#F8FAFC",
+                fontFamily: "inherit",
+                fontSize: "0.875rem",
+                height: "2.25rem",
+                borderRadius: "0.5rem",
+                padding: "0 1rem",
+                width: "fit-content",
+              }}
+            />
           </nav>
         </div>
       )}
