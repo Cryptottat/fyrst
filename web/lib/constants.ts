@@ -2,21 +2,23 @@
 // FYRST Project Constants
 // ---------------------------------------------------------------------------
 
-/** Design system color tokens */
+/** Design system color tokens — Midnight Studio palette */
 export const COLORS = {
-  bg: "#0F172A",
-  bgCard: "#1E293B",
-  bgElevated: "#334155",
-  primary: "#2563EB",
-  secondary: "#D97706",
-  accent: "#059669",
-  success: "#10B981",
-  error: "#DC2626",
-  warning: "#D97706",
-  textPrimary: "#F8FAFC",
-  textSecondary: "#94A3B8",
-  textMuted: "#475569",
-  border: "#334155",
+  bg: "#0C0C0F",
+  bgCard: "#141417",
+  bgElevated: "#1C1C21",
+  bgHover: "#232329",
+  primary: "#A78BFA",
+  secondary: "#FB923C",
+  accent: "#34D399",
+  success: "#34D399",
+  error: "#F87171",
+  warning: "#FBBF24",
+  textPrimary: "#EDEDEF",
+  textSecondary: "#8B8B96",
+  textMuted: "#52525B",
+  border: "#27272A",
+  borderHover: "#3F3F46",
 } as const;
 
 /** Holder tier definitions */

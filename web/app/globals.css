@@ -1,25 +1,177 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0F172A;
-  --color-bg-card: #1E293B;
-  --color-bg-elevated: #334155;
-  --color-primary: #2563EB;
-  --color-secondary: #D97706;
-  --color-accent: #059669;
-  --color-success: #10B981;
-  --color-error: #DC2626;
-  --color-warning: #D97706;
-  --color-text-primary: #F8FAFC;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #475569;
-  --color-border: #334155;
-  --font-sans: "Inter", sans-serif;
-  --font-display: "Inter", sans-serif;
+  --color-bg: #0A0A0C;
+  --color-bg-card: #111115;
+  --color-bg-elevated: #1A1A20;
+  --color-bg-hover: #222228;
+  --color-primary: #A78BFA;
+  --color-primary-dim: #7C3AED;
+  --color-secondary: #FB923C;
+  --color-accent: #34D399;
+  --color-success: #34D399;
+  --color-error: #F87171;
+  --color-warning: #FBBF24;
+  --color-text-primary: #EDEDEF;
+  --color-text-secondary: #9E9EA8;
+  --color-text-muted: #55555F;
+  --color-border: #2A2A30;
+  --color-border-hover: #44444C;
+  --font-sans: "DM Sans", sans-serif;
+  --font-display: "Press Start 2P", cursive;
   --font-mono: "JetBrains Mono", monospace;
+  --font-score: "VT323", monospace;
 }
 
 body {
-  background-color: #0F172A;
-  color: #F8FAFC;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+/* ── CRT Monitor Overlay ─────────────────────────────────────── */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.06) 2px,
+      rgba(0, 0, 0, 0.06) 4px
+    );
+  box-shadow: inset 0 0 120px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Pixel-perfect images ─────────────────────────────────────── */
+img[data-pixel] {
+  image-rendering: pixelated;
+}
+
+/* ── Arcade Pixel Border ──────────────────────────────────────── */
+.arcade-border {
+  border: 2px solid var(--color-border);
+  box-shadow:
+    inset -2px -2px 0 0 rgba(0, 0, 0, 0.4),
+    inset 2px 2px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.arcade-border-primary {
+  border: 2px solid var(--color-primary);
+  box-shadow:
+    inset -2px -2px 0 0 var(--color-primary-dim),
+    inset 2px 2px 0 0 rgba(199, 181, 253, 0.3),
+    0 0 12px rgba(167, 139, 250, 0.15);
+}
+
+.arcade-border-active {
+  border: 2px solid var(--color-primary);
+  box-shadow:
+    0 0 16px rgba(167, 139, 250, 0.3),
+    0 0 32px rgba(167, 139, 250, 0.1);
+}
+
+/* ── Chunky Arcade Button ─────────────────────────────────────── */
+.arcade-btn {
+  box-shadow:
+    inset -3px -3px 0px rgba(0, 0, 0, 0.5),
+    inset 3px 3px 0px rgba(255, 255, 255, 0.15);
+  transition: transform 0.05s steps(1), box-shadow 0.05s steps(1);
+}
+.arcade-btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+
+/* ── LED / Neon Glow Text ─────────────────────────────────────── */
+.neon-text {
+  text-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
+}
+.neon-text-subtle {
+  text-shadow: 0 0 6px currentColor;
+}
+
+/* ── Blink Animation (PRESS START) ────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink {
+  animation: blink 1s steps(1) infinite;
+}
+
+/* ── Arcade Idle Bob (mascot float) ───────────────────────────── */
+@keyframes arcade-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-arcade-bob {
+  animation: arcade-bob 1.2s steps(4) infinite;
+}
+
+/* ── Screen Shake ─────────────────────────────────────────────── */
+@keyframes screen-shake {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 2px); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, -1px); }
+  80% { transform: translate(2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+.animate-shake {
+  animation: screen-shake 0.2s steps(5) 1;
+}
+
+/* ── Slide In (for menu items) ────────────────────────────────── */
+@keyframes slide-in-right {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in {
+  animation: slide-in-right 0.3s steps(4) forwards;
+}
+
+/* ── Score Count Up (for stats) ───────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { text-shadow: 0 0 6px currentColor; }
+  50% { text-shadow: 0 0 14px currentColor, 0 0 28px currentColor; }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s steps(4) infinite;
+}
+
+/* ── P1 cursor blink ──────────────────────────────────────────── */
+@keyframes p1-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-p1 {
+  animation: p1-blink 0.6s steps(1) infinite;
+}
+
+/* ── Custom Scrollbar (arcade dark) ───────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) var(--color-bg);
+}
+
+/* ── Selection color ──────────────────────────────────────────── */
+::selection {
+  background: rgba(167, 139, 250, 0.3);
+  color: #fff;
 }

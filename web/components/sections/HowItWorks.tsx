@@ -1,77 +1,79 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Shield, Fingerprint, RotateCcw } from "lucide-react";
+import Image from "next/image";
 
 const steps = [
   {
-    icon: Shield,
-    title: "Deployer Stakes Collateral",
+    step: "STEP 1",
+    icon: "/images/icon-coin-slot.png",
+    title: "INSERT COIN (COLLATERAL)",
     description:
-      "Every token deployer must lock SOL as collateral in a trustless escrow. Bronze to Diamond tiers signal commitment level. If the token rugs, their collateral is at risk.",
+      "Deployers lock SOL. Play fair, or the machine eats your coin.",
   },
   {
-    icon: Fingerprint,
-    title: "Reputation Tracked Cross-Wallet",
+    step: "STEP 2",
+    icon: "/images/icon-save-file.png",
+    title: "PLAYER PROFILE",
     description:
-      "The Deployer Reputation System (DRS) tracks behavior across wallets using on-chain pattern analysis. No hiding behind new addresses. Past launches build your permanent record.",
+      "Your wallet is your save file. Ruggers get a permanent GAME OVER.",
   },
   {
-    icon: RotateCcw,
-    title: "Auto-Refund on Rug",
+    step: "STEP 3",
+    icon: "/images/icon-1up.png",
+    title: "1UP GUARANTEE",
     description:
-      "If a token meets rug-pull criteria during the safe period, buyers automatically receive refunds from the escrowed collateral. No claims process. No disputes. Just protection.",
+      "If the dev rage-quits, players get an auto-refund. Continue? 9... 8... 7...",
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section className="py-24 px-6">
-      <div className="max-w-6xl mx-auto">
-        <motion.div
-          className="text-center mb-16"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="text-3xl md:text-4xl font-bold text-text-primary mb-4">
-            How It Works
+    <section className="py-20 px-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-12">
+          <h2 className="text-xs md:text-sm font-display text-text-primary mb-3 leading-relaxed">
+            HOW TO PLAY
           </h2>
-          <p className="text-text-secondary max-w-xl mx-auto">
-            Three layers of protection between you and the next rug pull.
+          <p className="text-sm text-text-secondary font-mono">
+            <span className="text-primary">&gt; </span>
+            Three layers of protection.
           </p>
-        </motion.div>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {steps.map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <motion.div
-                key={step.title}
-                className="bg-bg-card border border-border rounded-xl p-8 border-l-4 border-l-primary"
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.15 }}
-              >
-                <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10 mb-6">
-                  <Icon className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-xs font-mono text-text-muted">
-                    0{i + 1}
-                  </span>
-                  <h3 className="text-lg font-semibold text-text-primary">
-                    {step.title}
-                  </h3>
-                </div>
-                <p className="text-sm text-text-secondary leading-relaxed">
-                  {step.description}
-                </p>
-              </motion.div>
-            );
-          })}
+        <div className="grid md:grid-cols-3 gap-5">
+          {steps.map((step, i) => (
+            <div
+              key={step.title}
+              className="arcade-border bg-bg-card p-6 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(167,139,250,0.15)] transition-all"
+            >
+              {/* Step number badge */}
+              <div className="absolute -top-3 left-4 bg-bg-card px-2">
+                <span className="text-[8px] font-display text-primary neon-text-subtle tracking-wider">
+                  {step.step}
+                </span>
+              </div>
+
+              {/* Icon */}
+              <div className="flex justify-center my-5">
+                <Image
+                  src={step.icon}
+                  alt={step.title}
+                  width={64}
+                  height={64}
+                  style={{ imageRendering: "pixelated" }}
+                  data-pixel=""
+                  className="drop-shadow-[0_0_12px_rgba(167,139,250,0.3)]"
+                />
+              </div>
+
+              <h3 className="text-[9px] font-display text-text-primary mb-3 leading-relaxed text-center">
+                {step.title}
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed text-center">
+                {step.description}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </section>

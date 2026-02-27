@@ -75,7 +75,11 @@ export function useAnchorProgram() {
 
   const program: FyrstProgram | null = useMemo(() => {
     if (!provider) return null;
-    return new Program(IDL, provider);
+    try {
+      return new Program(IDL, provider);
+    } catch {
+      return null;
+    }
   }, [provider]);
 
   return { program, provider, connection };

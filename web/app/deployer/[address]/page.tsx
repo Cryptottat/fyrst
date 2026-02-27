@@ -13,50 +13,38 @@ import {
   formatTimeAgo,
   getReputationGrade,
 } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
 
 function ReputationGauge({ score }: { score: number }) {
   const grade = getReputationGrade(score);
-  const rotation = (score / 100) * 180 - 90;
+  const barWidth = Math.min(100, Math.max(0, score));
+  const barColor =
+    score >= 80
+      ? "bg-success"
+      : score >= 60
+        ? "bg-warning"
+        : "bg-error";
+  const glowColor =
+    score >= 80
+      ? "rgba(52,211,153,0.4)"
+      : score >= 60
+        ? "rgba(251,191,36,0.4)"
+        : "rgba(248,113,113,0.4)";
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-40 h-20 overflow-hidden">
-        <div className="absolute inset-0 rounded-t-full border-8 border-bg-elevated" />
-        <div
-          className="absolute inset-0 rounded-t-full border-8 border-transparent"
-          style={{
-            borderTopColor:
-              score >= 80
-                ? "#10B981"
-                : score >= 60
-                  ? "#D97706"
-                  : "#DC2626",
-            borderLeftColor:
-              score >= 50
-                ? score >= 80
-                  ? "#10B981"
-                  : "#D97706"
-                : "transparent",
-            borderRightColor: "transparent",
-          }}
-        />
-        <div
-          className="absolute bottom-0 left-1/2 origin-bottom w-0.5 h-16 bg-text-primary rounded-full"
-          style={{
-            transform: `translateX(-50%) rotate(${rotation}deg)`,
-            transition: "transform 1s ease-out",
-          }}
-        />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3 h-3 bg-text-primary rounded-full" />
+    <div className="flex flex-col items-center w-full">
+      <div className="text-2xl font-score text-text-primary neon-text mb-1">
+        {score}<span className="text-sm text-text-muted">/100</span>
       </div>
-      <div className="mt-3 text-center">
-        <span className="text-3xl font-mono font-bold text-text-primary">
-          {score}
-        </span>
-        <span className="text-lg text-text-muted">/100</span>
+      <Badge label={grade} variant="reputation" className="mb-3" />
+      <div className="w-full arcade-border p-1">
+        <div
+          className={`h-2.5 ${barColor} transition-all duration-700`}
+          style={{ width: `${barWidth}%`, boxShadow: `0 0 8px ${glowColor}` }}
+        />
       </div>
-      <Badge label={grade} variant="reputation" className="mt-2" />
+      <p className="text-[9px] font-display text-text-muted mt-2">
+        {score >= 80 ? "TRUSTED" : score >= 60 ? "DECENT" : "CAUTION"}
+      </p>
     </div>
   );
 }
@@ -95,24 +83,25 @@ export default function DeployerPage({
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-bg pt-24 pb-16 px-6 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <main className="min-h-screen pt-20 pb-16 px-6 flex items-center justify-center">
+        <p className="text-[10px] font-display text-text-muted animate-blink">LOADING PLAYER PROFILE...</p>
       </main>
     );
   }
 
   if (error || !deployer) {
     return (
-      <main className="min-h-screen bg-bg pt-24 pb-16 px-6 flex items-center justify-center">
+      <main className="min-h-screen pt-20 pb-16 px-6 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-text-primary mb-2">
-            Deployer Not Found
+          <h1 className="text-xs font-display text-error neon-text-subtle mb-3 leading-relaxed">
+            PLAYER NOT FOUND
           </h1>
-          <p className="text-text-secondary mb-6">
-            No deployer profile found for {formatAddress(address, 8)}.
+          <p className="text-xs text-text-muted font-mono mb-6">
+            <span className="text-primary">&gt; </span>
+            No profile for {formatAddress(address, 8)}.
           </p>
           <Link href="/dashboard">
-            <Button variant="outline">Back to Dashboard</Button>
+            <Button variant="outline">[ BACK TO DASHBOARD ]</Button>
           </Link>
         </div>
       </main>
@@ -123,57 +112,53 @@ export default function DeployerPage({
   const tokens = deployer.launchHistory ?? [];
 
   return (
-    <main className="min-h-screen bg-bg pt-24 pb-16 px-6">
+    <main className="min-h-screen pt-20 pb-16 px-6">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">
-            Deployer Profile
+        <div className="mb-8">
+          <h1 className="text-xs md:text-sm font-display text-text-primary mb-3 leading-relaxed">
+            PLAYER PROFILE
           </h1>
-          <p className="font-mono text-text-secondary">
+          <p className="text-xs font-mono text-text-secondary">
             {formatAddress(address, 8)}
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
           <Card padding="lg" className="flex items-center justify-center">
             <ReputationGauge score={deployer.reputationScore} />
           </Card>
 
           <Card padding="lg" className="md:col-span-2">
-            <h3 className="text-sm font-semibold text-text-secondary mb-6">
-              Statistics
-            </h3>
-            <div className="grid grid-cols-2 gap-6">
+            <h3 className="text-[8px] font-display text-text-muted mb-4 tracking-wider">STATISTICS</h3>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-text-muted mb-1">Past Launches</p>
-                <p className="text-2xl font-mono font-bold text-text-primary">
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">LAUNCHES</p>
+                <p className="text-2xl font-score text-text-primary neon-text-subtle">
                   {deployer.totalLaunches}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-text-muted mb-1">Rug Count</p>
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">RUG COUNT</p>
                 <p
-                  className={`text-2xl font-mono font-bold ${deployer.rugPulls > 0 ? "text-error" : "text-success"}`}
+                  className={`text-2xl font-score ${deployer.rugPulls > 0 ? "text-error neon-text-subtle" : "text-success neon-text-subtle"}`}
                 >
                   {deployer.rugPulls}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-text-muted mb-1">Collateral Locked</p>
-                <p className="text-2xl font-mono font-bold text-text-primary">
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">COLLATERAL</p>
+                <p className="text-2xl font-score text-text-primary neon-text-subtle">
                   {deployer.collateralLocked}
-                  <span className="text-sm text-text-muted ml-1">SOL</span>
+                  <span className="text-xs text-text-muted ml-1">SOL</span>
                 </p>
               </div>
               <div>
-                <p className="text-xs text-text-muted mb-1">Grade</p>
-                <p className="text-2xl font-bold">
-                  <Badge
-                    label={grade}
-                    variant="reputation"
-                    className="text-lg px-3 py-1"
-                  />
-                </p>
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">GRADE</p>
+                <Badge
+                  label={grade}
+                  variant="reputation"
+                  className="mt-1"
+                />
               </div>
             </div>
           </Card>
@@ -181,11 +166,11 @@ export default function DeployerPage({
 
         {/* Launch history */}
         <div>
-          <h2 className="text-xl font-bold text-text-primary mb-6">
-            Launch History
+          <h2 className="text-[10px] font-display text-text-primary mb-4 leading-relaxed tracking-wider">
+            LAUNCH HISTORY
           </h2>
           {tokens.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {tokens.map((token) => (
                 <Link key={token.mint} href={`/token/${token.mint}`}>
                   <Card
@@ -194,22 +179,22 @@ export default function DeployerPage({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-base font-semibold text-text-primary">
+                        <h3 className="text-[10px] font-display text-text-primary leading-relaxed">
                           {token.name}
                         </h3>
-                        <span className="text-sm font-mono text-text-muted">
+                        <span className="text-xs font-mono text-text-muted">
                           ${token.symbol}
                         </span>
                       </div>
-                      <p className="text-xs text-text-muted">
-                        Launched {formatTimeAgo(token.createdAt)}
+                      <p className="text-[10px] text-text-muted font-mono">
+                        {formatTimeAgo(token.createdAt)}
                       </p>
                     </div>
                     <div className="w-28 shrink-0">
                       <ProgressBar value={token.bondingCurveProgress} />
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-mono text-text-primary">
+                      <p className="text-sm font-score text-text-primary neon-text-subtle">
                         ${formatCompact(token.marketCap)}
                       </p>
                     </div>
@@ -218,8 +203,10 @@ export default function DeployerPage({
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 text-text-muted">
-              No launches found for this deployer.
+            <div className="text-center py-12">
+              <p className="text-[10px] font-display text-text-muted">
+                NO LAUNCHES YET.
+              </p>
             </div>
           )}
         </div>

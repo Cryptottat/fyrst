@@ -10,57 +10,55 @@ import {
   formatCompact,
   formatTimeAgo,
   getReputationGrade,
-  getCollateralTier,
 } from "@/lib/utils";
-import { Search, Loader2 } from "lucide-react";
+import { Search } from "lucide-react";
 
 type SortKey = "newest" | "marketCap" | "reputation";
 
-function collateralToSol(tier: string): number {
-  switch (tier) {
-    case "Diamond": return 25;
-    case "Gold": return 10;
-    case "Silver": return 5;
-    default: return 1;
-  }
-}
-
-function TokenRow({ token }: { token: ApiToken }) {
+function TokenRow({ token, index }: { token: ApiToken; index: number }) {
   const score = token.deployer?.reputationScore ?? 50;
   const grade = getReputationGrade(score);
   const tier = token.collateralTier || "Bronze";
 
   return (
     <Link href={`/token/${token.mint}`}>
-      <Card hover className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <Card hover className="flex flex-col sm:flex-row sm:items-center gap-4 relative group">
+        {/* P1 cursor on hover */}
+        <div className="absolute -left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[8px] font-display text-primary animate-p1 neon-text">P1</span>
+        </div>
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <h3 className="text-base font-semibold text-text-primary truncate">
+            <span className="text-[8px] font-display text-text-muted">
+              #{String(index + 1).padStart(2, "0")}
+            </span>
+            <h3 className="text-[10px] font-display text-text-primary truncate leading-relaxed">
               {token.name}
             </h3>
-            <span className="text-sm font-mono text-text-muted">
+            <span className="text-xs font-mono text-text-muted">
               ${token.symbol}
             </span>
           </div>
-          <p className="text-xs text-text-muted truncate">
+          <p className="text-[10px] text-text-muted truncate">
             {token.description}
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <Badge label={grade} variant="reputation" />
           <Badge label={tier} variant="collateral" />
         </div>
 
-        <div className="w-32 shrink-0">
+        <div className="w-28 shrink-0">
           <ProgressBar value={token.bondingCurveProgress} />
         </div>
 
         <div className="text-right shrink-0 w-24">
-          <p className="text-sm font-mono text-text-primary">
+          <p className="text-sm font-score text-text-primary neon-text-subtle">
             ${formatCompact(token.marketCap)}
           </p>
-          <p className="text-xs text-text-muted font-mono">
+          <p className="text-[9px] text-text-muted font-mono">
             {formatTimeAgo(token.createdAt)}
           </p>
         </div>
@@ -109,47 +107,46 @@ export default function DashboardPage() {
   }, [search, tokens]);
 
   return (
-    <main className="min-h-screen bg-bg pt-24 pb-16 px-6">
+    <main className="min-h-screen pt-20 pb-16 px-6">
       <div className="max-w-5xl mx-auto">
-        <div className="mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">
-            Dashboard
+        <div className="mb-8">
+          <h1 className="text-xs md:text-sm font-display text-text-primary mb-3 leading-relaxed">
+            PLAYER SELECT
           </h1>
-          <p className="text-text-secondary">
-            Browse and discover live token launches on FYRST.
+          <p className="text-sm text-text-secondary font-mono">
+            <span className="text-primary">&gt; </span>
+            Browse and discover live token launches.
           </p>
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          {/* Search */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted" />
             <input
               type="text"
-              placeholder="Search tokens..."
+              placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-bg-card border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+              className="w-full bg-bg-card arcade-border pl-9 pr-4 py-2.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
             />
           </div>
 
-          {/* Sort */}
           <div className="flex gap-2">
             {(
               [
-                { key: "newest", label: "Newest" },
-                { key: "marketCap", label: "Market Cap" },
-                { key: "reputation", label: "Reputation" },
+                { key: "newest", label: "NEW" },
+                { key: "marketCap", label: "MCAP" },
+                { key: "reputation", label: "REP" },
               ] as const
             ).map((option) => (
               <button
                 key={option.key}
                 onClick={() => setSort(option.key)}
-                className={`px-4 py-2 text-xs rounded-lg border transition-colors cursor-pointer ${
+                className={`px-3 py-2.5 text-[8px] font-display border-2 transition-colors cursor-pointer ${
                   sort === option.key
-                    ? "border-primary text-primary bg-primary/10"
-                    : "border-border text-text-muted hover:border-text-muted"
+                    ? "border-primary text-primary bg-primary/10 neon-text-subtle"
+                    : "border-border text-text-muted hover:border-border-hover"
                 }`}
               >
                 {option.label}
@@ -159,26 +156,27 @@ export default function DashboardPage() {
         </div>
 
         {/* Token list */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-text-muted">
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Loading launches...
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+              <p className="text-[10px] font-display animate-blink">LOADING...</p>
             </div>
           ) : error ? (
             <div className="text-center py-16">
-              <p className="text-error mb-2">Failed to load launches</p>
-              <p className="text-text-muted text-sm">{error}</p>
+              <p className="text-xs font-display text-error neon-text-subtle mb-2">CONNECTION ERROR</p>
+              <p className="text-xs text-text-muted font-mono">{error}</p>
             </div>
           ) : filtered.length > 0 ? (
-            filtered.map((token) => (
-              <TokenRow key={token.mint} token={token} />
+            filtered.map((token, i) => (
+              <TokenRow key={token.mint} token={token} index={i} />
             ))
           ) : (
-            <div className="text-center py-16 text-text-muted">
-              {search.trim()
-                ? "No tokens match your search."
-                : "No tokens launched yet. Be the first!"}
+            <div className="text-center py-16">
+              <p className="text-[10px] font-display text-text-muted">
+                {search.trim()
+                  ? "NO MATCH FOUND."
+                  : "NO PLAYERS YET. BE THE FIRST!"}
+              </p>
             </div>
           )}
         </div>

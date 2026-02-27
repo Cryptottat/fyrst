@@ -34,23 +34,24 @@ export default function BondingCurveChart({
 
       const chart = createChart(containerRef.current, {
         layout: {
-          background: { type: ColorType.Solid, color: "#0F172A" },
-          textColor: "#94A3B8",
-          fontFamily: "Inter, system-ui, sans-serif",
+          background: { type: ColorType.Solid, color: "#0A0A0C" },
+          textColor: "#55555F",
+          fontFamily: "'VT323', 'JetBrains Mono', monospace",
+          fontSize: 12,
         },
         grid: {
-          vertLines: { color: "rgba(148, 163, 184, 0.06)" },
-          horzLines: { color: "rgba(148, 163, 184, 0.06)" },
+          vertLines: { color: "rgba(42, 42, 48, 0.5)" },
+          horzLines: { color: "rgba(42, 42, 48, 0.5)" },
         },
         crosshair: {
-          vertLine: { color: "rgba(37, 99, 235, 0.4)", labelBackgroundColor: "#2563EB" },
-          horzLine: { color: "rgba(37, 99, 235, 0.4)", labelBackgroundColor: "#2563EB" },
+          vertLine: { color: "rgba(167, 139, 250, 0.4)", labelBackgroundColor: "#A78BFA" },
+          horzLine: { color: "rgba(167, 139, 250, 0.4)", labelBackgroundColor: "#A78BFA" },
         },
         rightPriceScale: {
-          borderColor: "rgba(148, 163, 184, 0.1)",
+          borderColor: "#2A2A30",
         },
         timeScale: {
-          borderColor: "rgba(148, 163, 184, 0.1)",
+          borderColor: "#2A2A30",
           timeVisible: true,
           secondsVisible: false,
         },
@@ -60,9 +61,9 @@ export default function BondingCurveChart({
       chartRef.current = chart;
 
       const areaSeries = chart.addSeries(AreaSeries, {
-        lineColor: "#2563EB",
-        topColor: "rgba(37, 99, 235, 0.4)",
-        bottomColor: "rgba(37, 99, 235, 0.0)",
+        lineColor: "#A78BFA",
+        topColor: "rgba(167, 139, 250, 0.2)",
+        bottomColor: "rgba(167, 139, 250, 0.0)",
         lineWidth: 2,
       });
 
@@ -76,11 +77,11 @@ export default function BondingCurveChart({
 
       areaSeries.createPriceLine({
         price: currentPrice,
-        color: "#D97706",
+        color: "#FB923C",
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
-        title: "Current",
+        title: "NOW",
       });
 
       chart.timeScale().fitContent();
@@ -95,7 +96,6 @@ export default function BondingCurveChart({
 
       resizeObserver.observe(containerRef.current);
 
-      // Store cleanup in a way accessible to the outer cleanup function
       (chart as unknown as Record<string, () => void>).__resizeCleanup = () => {
         resizeObserver.disconnect();
       };
@@ -117,8 +117,8 @@ export default function BondingCurveChart({
   return (
     <div
       ref={containerRef}
-      className="w-full"
-      style={{ height: 300 }}
+      className="w-full arcade-border"
+      style={{ height: 280 }}
     />
   );
 }

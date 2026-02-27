@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Press_Start_2P, DM_Sans, JetBrains_Mono, VT323 } from "next/font/google";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import WalletProvider from "@/components/providers/WalletProvider";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const pressStart2P = Press_Start_2P({
+  variable: "--font-press-start",
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
   display: "swap",
 });
@@ -17,10 +24,17 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const vt323 = VT323({
+  variable: "--font-vt323",
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "FYRST - Launch safe. Buy confident.",
+  title: "FYRST - The Anti-Casino",
   description:
-    "FYRST is a Solana responsible token launchpad. Launch safe. Buy confident.",
+    "FYRST: The Anti-Casino. No rugs, no casino BS. A Solana token launchpad with deployer collateral, cross-wallet reputation, and auto refunds.",
 };
 
 export default function RootLayout({
@@ -31,9 +45,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-bg text-text-primary`}
+        className={`${pressStart2P.variable} ${dmSans.variable} ${jetbrainsMono.variable} ${vt323.variable} font-sans antialiased bg-bg text-text-primary`}
       >
         <WalletProvider>
+          {/* CRT scanline + vignette overlay */}
+          <div className="crt-overlay" />
           <Header />
           <div className="min-h-screen">{children}</div>
           <Footer />

@@ -27,10 +27,9 @@ export default function Card({
   return (
     <div
       className={cn(
-        "bg-bg-card border border-border rounded-xl",
+        "bg-bg-card arcade-border",
         paddingStyles[padding],
-        hover &&
-          "transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5",
+        hover && "group/card transition-all duration-100 hover:border-primary hover:shadow-[0_0_16px_rgba(167,139,250,0.25),0_0_32px_rgba(167,139,250,0.1)]",
         className,
       )}
       {...props}

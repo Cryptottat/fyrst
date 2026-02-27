@@ -4,7 +4,7 @@ import { app } from "./app";
 import { config } from "./config";
 import { logger } from "./utils/logger";
 import { setIo } from "./socketManager";
-import { connectDb } from "./lib/prisma";
+import { connectDb, seedIfEmpty } from "./lib/prisma";
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -54,6 +54,7 @@ setInterval(() => {
 async function start(): Promise<void> {
   // Attempt DB connection (non-fatal if it fails)
   await connectDb();
+  await seedIfEmpty();
 
   httpServer.listen(config.port, () => {
     logger.info(`FYRST API server running on port ${config.port}`);

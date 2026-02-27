@@ -19,18 +19,29 @@ export default function ProgressBar({
     <div className={cn("w-full", className)}>
       {showLabel && (
         <div className="flex justify-between mb-1">
-          <span className="text-xs text-text-muted">Bonding Curve</span>
-          <span className="text-xs font-mono text-text-secondary">
-            {clamped}%
+          <span className="text-[9px] font-display text-text-muted">HP</span>
+          <span className="text-xs font-score text-text-secondary neon-text-subtle">
+            {clamped}/100
           </span>
         </div>
       )}
-      <div className="w-full h-2 bg-bg-elevated rounded-full overflow-hidden">
+      <div className="w-full h-3 bg-bg-elevated arcade-border overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-500 ease-out"
+          className="h-full transition-all duration-300"
           style={{
             width: `${clamped}%`,
-            background: `linear-gradient(90deg, #2563EB, #059669)`,
+            background:
+              clamped > 60
+                ? "linear-gradient(90deg, #34D399, #6EE7B7)"
+                : clamped > 30
+                  ? "linear-gradient(90deg, #FBBF24, #FCD34D)"
+                  : "linear-gradient(90deg, #F87171, #FCA5A5)",
+            boxShadow:
+              clamped > 60
+                ? "0 0 8px rgba(52, 211, 153, 0.4)"
+                : clamped > 30
+                  ? "0 0 8px rgba(251, 191, 36, 0.4)"
+                  : "0 0 8px rgba(248, 113, 113, 0.4)",
           }}
         />
       </div>

@@ -11,18 +11,18 @@ interface BadgeProps {
 }
 
 const reputationColors: Record<string, string> = {
-  A: "bg-success/15 text-success border-success/30",
-  B: "bg-primary/15 text-primary border-primary/30",
-  C: "bg-secondary/15 text-secondary border-secondary/30",
-  D: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-  F: "bg-error/15 text-error border-error/30",
+  A: "bg-success/15 text-success border-success/40",
+  B: "bg-primary/15 text-primary border-primary/40",
+  C: "bg-secondary/15 text-secondary border-secondary/40",
+  D: "bg-warning/15 text-warning border-warning/40",
+  F: "bg-error/15 text-error border-error/40",
 };
 
 const collateralColors: Record<string, string> = {
-  Bronze: "bg-amber-800/15 text-amber-600 border-amber-800/30",
-  Silver: "bg-gray-400/15 text-gray-300 border-gray-400/30",
-  Gold: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  Diamond: "bg-cyan-400/15 text-cyan-300 border-cyan-400/30",
+  Bronze: "bg-amber-700/15 text-amber-500 border-amber-700/40",
+  Silver: "bg-zinc-400/15 text-zinc-300 border-zinc-400/40",
+  Gold: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
+  Diamond: "bg-cyan-400/15 text-cyan-300 border-cyan-400/40",
 };
 
 export default function Badge({ label, variant = "reputation", className }: BadgeProps) {
@@ -32,7 +32,7 @@ export default function Badge({ label, variant = "reputation", className }: Badg
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded border font-mono",
+        "inline-flex items-center px-2 py-0.5 text-[9px] font-display border-2 neon-text-subtle",
         colorClass,
         className,
       )}

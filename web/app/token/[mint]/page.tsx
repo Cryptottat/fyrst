@@ -53,7 +53,6 @@ export default function TokenDetailPage({
   const [sellStatus, setSellStatus] = useState<TxStatus>("idle");
   const [txError, setTxError] = useState<string | null>(null);
 
-  // Fetch API data
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -83,7 +82,6 @@ export default function TokenDetailPage({
     return () => { cancelled = true; };
   }, [mint]);
 
-  // Fetch on-chain data
   const refreshOnChainData = useCallback(async () => {
     if (!program) return;
     try {
@@ -104,7 +102,6 @@ export default function TokenDetailPage({
     refreshOnChainData();
   }, [refreshOnChainData]);
 
-  // On-chain price from curve
   const onChainPrice = curveData
     ? curveData.basePrice.add(curveData.slope.mul(curveData.currentSupply)).toNumber() / 1e9
     : null;
@@ -115,11 +112,9 @@ export default function TokenDetailPage({
 
   const displayPrice = onChainPrice ?? token?.currentPrice ?? 0;
 
-  // Generate chart data from on-chain state
   const chartTrades = (() => {
     const now = Math.floor(Date.now() / 1000);
     const trades: { time: number; price: number; volume: number }[] = [];
-    // Simple chart with a single data point from current price
     for (let i = 0; i < 50; i++) {
       const time = now - (50 - i) * 300;
       const baseP = displayPrice * (0.8 + 0.4 * (i / 50));
@@ -133,7 +128,6 @@ export default function TokenDetailPage({
     return trades;
   })();
 
-  // Buy handler
   const handleBuy = async () => {
     if (!program || !publicKey || !buyAmount) return;
     setBuyStatus("loading");
@@ -146,7 +140,6 @@ export default function TokenDetailPage({
 
       const { txSig } = await buyTokens(program, publicKey, mintPubkey, lamports);
 
-      // Record trade in backend
       await recordTrade({
         tokenMint: mint,
         traderAddress: publicKey.toBase58(),
@@ -167,7 +160,6 @@ export default function TokenDetailPage({
     }
   };
 
-  // Sell handler
   const handleSell = async () => {
     if (!program || !publicKey || !sellAmount) return;
     setSellStatus("loading");
@@ -198,32 +190,33 @@ export default function TokenDetailPage({
     }
   };
 
-  // Balance from BuyerRecord
   const tokenBalance = buyerRecord
     ? buyerRecord.totalBought.toNumber()
     : 0;
 
+  const inputClass = "w-full bg-bg arcade-border px-4 py-3 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors disabled:opacity-50";
+
   if (loading) {
     return (
-      <main className="min-h-screen bg-bg pt-24 pb-16 px-6 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <main className="min-h-screen pt-20 pb-16 px-6 flex items-center justify-center">
+        <p className="text-[10px] font-display text-text-muted animate-blink">LOADING...</p>
       </main>
     );
   }
 
   if (error || !token) {
     return (
-      <main className="min-h-screen bg-bg pt-24 pb-16 px-6 flex items-center justify-center">
+      <main className="min-h-screen pt-20 pb-16 px-6 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-text-primary mb-2">
-            Token Not Found
+          <h1 className="text-xs font-display text-error neon-text-subtle mb-3 leading-relaxed">
+            TOKEN NOT FOUND
           </h1>
-          <p className="text-text-secondary mb-6">
-            The token with mint address {formatAddress(mint, 8)} could not be
-            found.
+          <p className="text-xs text-text-muted font-mono mb-6">
+            <span className="text-primary">&gt; </span>
+            No data for {formatAddress(mint, 8)}.
           </p>
           <Link href="/dashboard">
-            <Button variant="outline">Back to Dashboard</Button>
+            <Button variant="outline">[ BACK TO DASHBOARD ]</Button>
           </Link>
         </div>
       </main>
@@ -239,16 +232,16 @@ export default function TokenDetailPage({
     : token.bondingCurveProgress;
 
   return (
-    <main className="min-h-screen bg-bg pt-24 pb-16 px-6">
+    <main className="min-h-screen pt-20 pb-16 px-6">
       <div className="max-w-5xl mx-auto">
         {/* Token header */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-text-primary">
+              <h1 className="text-sm md:text-base font-display text-text-primary leading-relaxed">
                 {token.name}
               </h1>
-              <p className="text-lg font-mono text-text-muted">
+              <p className="text-xs font-mono text-text-muted">
                 ${token.symbol}
               </p>
             </div>
@@ -257,102 +250,91 @@ export default function TokenDetailPage({
               <Badge label={tier} variant="collateral" />
             </div>
           </div>
-          <p className="text-text-secondary mb-4">{token.description}</p>
-          <div className="flex items-center gap-2 text-sm text-text-muted">
+          <p className="text-xs text-text-secondary mb-4">{token.description}</p>
+          <div className="flex items-center gap-2 text-[10px] text-text-muted font-mono">
             <span>Deployer:</span>
             <Link
               href={`/deployer/${token.deployerAddress}`}
-              className="font-mono text-primary hover:text-primary/80 transition-colors"
+              className="text-primary hover:text-primary/80 transition-colors neon-text-subtle"
             >
               {formatAddress(token.deployerAddress)}
             </Link>
-            <span className="mx-2">|</span>
-            <span>Launched {formatTimeAgo(token.createdAt)}</span>
+            <span className="mx-1">|</span>
+            <span>{formatTimeAgo(token.createdAt)}</span>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left column - chart + info */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid lg:grid-cols-3 gap-4">
+          {/* Left column */}
+          <div className="lg:col-span-2 space-y-4">
             <Card padding="lg">
-              <h3 className="text-sm font-semibold text-text-secondary mb-4">
-                Price Chart
-              </h3>
+              <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">PRICE CHART</h3>
               <BondingCurveChart
                 trades={chartTrades}
                 currentPrice={displayPrice}
               />
             </Card>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Card padding="sm">
-                <p className="text-xs text-text-muted mb-1">Price</p>
-                <p className="text-lg font-mono font-bold text-text-primary">
-                  {displayPrice.toFixed(6)} SOL
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">PRICE</p>
+                <p className="text-sm font-score text-text-primary neon-text-subtle">
+                  {displayPrice.toFixed(6)}
                 </p>
               </Card>
               <Card padding="sm">
-                <p className="text-xs text-text-muted mb-1">Supply</p>
-                <p className="text-lg font-mono font-bold text-text-primary">
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">SUPPLY</p>
+                <p className="text-sm font-score text-text-primary neon-text-subtle">
                   {onChainSupply != null
                     ? formatCompact(onChainSupply)
                     : formatCompact(token.totalSupply)}
                 </p>
               </Card>
               <Card padding="sm">
-                <p className="text-xs text-text-muted mb-1">Reserve</p>
-                <p className="text-lg font-mono font-bold text-text-primary">
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">RESERVE</p>
+                <p className="text-sm font-score text-text-primary neon-text-subtle">
                   {curveData
                     ? formatSol(curveData.reserveBalance.toNumber() / 1e9)
-                    : "—"}
+                    : "\u2014"}
                 </p>
               </Card>
               <Card padding="sm">
-                <p className="text-xs text-text-muted mb-1">Collateral</p>
-                <p className="text-lg font-mono font-bold text-text-primary">
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">COLLATERAL</p>
+                <p className="text-sm font-score text-text-primary neon-text-subtle">
                   {formatSol(collateralSol)}
                 </p>
               </Card>
             </div>
 
-            {/* Bonding curve */}
             <Card>
-              <h3 className="text-sm font-semibold text-text-secondary mb-4">
-                Bonding Curve Progress
-              </h3>
+              <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">BONDING CURVE</h3>
               <ProgressBar value={progress} />
-              <p className="text-xs text-text-muted mt-2">
+              <p className="text-[10px] text-text-muted mt-2 font-mono">
+                <span className="text-primary">&gt; </span>
                 {progress >= 100
-                  ? "Bonding curve completed. Token is now fully launched."
-                  : `${100 - progress}% remaining until graduation to DEX.`}
+                  ? "Curve complete. Token graduated to DEX."
+                  : `${100 - progress}% until graduation.`}
               </p>
             </Card>
           </div>
 
-          {/* Right column - trade */}
-          <div className="space-y-6">
-            {/* Wallet balance */}
+          {/* Right column */}
+          <div className="space-y-4">
             {connected && tokenBalance > 0 && (
-              <Card>
-                <h3 className="text-sm font-semibold text-text-secondary mb-2">
-                  Your Balance
-                </h3>
-                <p className="text-xl font-mono font-bold text-text-primary">
+              <Card padding="sm">
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">YOUR BAG</p>
+                <p className="text-lg font-score text-text-primary neon-text-subtle">
                   {tokenBalance.toLocaleString()} tokens
                 </p>
               </Card>
             )}
 
-            {/* Buy */}
             <Card>
-              <h3 className="text-sm font-semibold text-text-secondary mb-4">
-                Buy
-              </h3>
+              <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">BUY</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-text-muted mb-1 block">
-                    Amount (SOL)
+                  <label className="text-[8px] font-display text-text-secondary mb-2 block tracking-wider">
+                    AMOUNT (SOL)
                   </label>
                   <input
                     type="number"
@@ -362,7 +344,7 @@ export default function TokenDetailPage({
                     onChange={(e) => setBuyAmount(e.target.value)}
                     placeholder="0.00"
                     disabled={buyStatus === "loading"}
-                    className="w-full bg-bg border border-border rounded-lg px-4 py-3 text-sm text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
+                    className={inputClass}
                   />
                 </div>
                 <Button
@@ -373,28 +355,25 @@ export default function TokenDetailPage({
                 >
                   {buyStatus === "loading" ? (
                     <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Confirming...
+                      <Loader2 className="w-3 h-3 animate-spin" /> CONFIRMING...
                     </span>
                   ) : buyStatus === "success" ? (
-                    "Buy Successful!"
+                    "+1UP!"
                   ) : !connected ? (
-                    "Connect Wallet"
+                    "CONNECT WALLET"
                   ) : (
-                    `Buy $${token.symbol}`
+                    `[ BUY $${token.symbol} ]`
                   )}
                 </Button>
               </div>
             </Card>
 
-            {/* Sell */}
             <Card>
-              <h3 className="text-sm font-semibold text-text-secondary mb-4">
-                Sell
-              </h3>
+              <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">SELL</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-text-muted mb-1 block">
-                    Amount (Tokens)
+                  <label className="text-[8px] font-display text-text-secondary mb-2 block tracking-wider">
+                    AMOUNT (TOKENS)
                   </label>
                   <input
                     type="number"
@@ -404,7 +383,7 @@ export default function TokenDetailPage({
                     onChange={(e) => setSellAmount(e.target.value)}
                     placeholder="0"
                     disabled={sellStatus === "loading"}
-                    className="w-full bg-bg border border-border rounded-lg px-4 py-3 text-sm text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
+                    className={inputClass}
                   />
                 </div>
                 <Button
@@ -415,61 +394,59 @@ export default function TokenDetailPage({
                 >
                   {sellStatus === "loading" ? (
                     <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Confirming...
+                      <Loader2 className="w-3 h-3 animate-spin" /> CONFIRMING...
                     </span>
                   ) : sellStatus === "success" ? (
-                    "Sell Successful!"
+                    "SOLD!"
                   ) : !connected ? (
-                    "Connect Wallet"
+                    "CONNECT WALLET"
                   ) : (
-                    `Sell $${token.symbol}`
+                    `[ SELL $${token.symbol} ]`
                   )}
                 </Button>
               </div>
             </Card>
 
-            {/* TX Error */}
             {txError && (
               <Card>
-                <p className="text-xs text-error">{txError}</p>
+                <p className="text-[10px] text-error font-mono neon-text-subtle">
+                  <span className="text-error">&gt; </span>{txError}
+                </p>
               </Card>
             )}
 
-            {/* Deployer card */}
             {(deployer || token.deployer) && (
               <Card>
-                <h3 className="text-sm font-semibold text-text-secondary mb-4">
-                  Deployer
-                </h3>
-                <div className="space-y-3">
+                <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">DEPLOYER</h3>
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-text-muted">Address</span>
+                    <span className="text-[10px] text-text-muted">Address</span>
                     <Link
                       href={`/deployer/${token.deployerAddress}`}
-                      className="font-mono text-xs text-primary hover:text-primary/80 transition-colors"
+                      className="font-mono text-[10px] text-primary hover:text-primary/80 transition-colors neon-text-subtle"
                     >
                       {formatAddress(token.deployerAddress)}
                     </Link>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-text-muted">Reputation</span>
-                    <span className="font-mono text-sm text-text-primary">
+                    <span className="text-[10px] text-text-muted">Reputation</span>
+                    <span className="font-score text-sm text-text-primary neon-text-subtle">
                       {score}/100
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-text-muted">Launches</span>
-                    <span className="font-mono text-sm text-text-primary">
+                    <span className="text-[10px] text-text-muted">Launches</span>
+                    <span className="font-score text-sm text-text-primary">
                       {deployer?.totalLaunches ?? token.deployer?.totalLaunches ?? 0}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-text-muted">Rug Count</span>
+                    <span className="text-[10px] text-text-muted">Rug Count</span>
                     <span
-                      className={`font-mono text-sm ${
+                      className={`font-score text-sm ${
                         (deployer?.rugPulls ?? token.deployer?.rugPulls ?? 0) > 0
-                          ? "text-error"
-                          : "text-success"
+                          ? "text-error neon-text-subtle"
+                          : "text-success neon-text-subtle"
                       }`}
                     >
                       {deployer?.rugPulls ?? token.deployer?.rugPulls ?? 0}

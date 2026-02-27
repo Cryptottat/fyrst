@@ -1,151 +1,145 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
-import Button from "@/components/ui/Button";
+import Image from "next/image";
+import { useState, useEffect, useCallback } from "react";
+import { useScreenShake } from "@/hooks/useScreenShake";
 
-const VaultScene = dynamic(() => import("@/components/three/VaultScene"), {
-  ssr: false,
-  loading: () => null,
-});
+function ScrambleText({ text, speed = 30 }: { text: string; speed?: number }) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  const chars = "!@#$%^&*()_+-=[]{}|;:,.<>?/~`";
 
-function FloatingParticle({ delay, x, y, size }: { delay: number; x: string; y: string; size: number }) {
+  useEffect(() => {
+    let i = 0;
+    setDisplayed("");
+    setDone(false);
+
+    const interval = setInterval(() => {
+      if (i < text.length) {
+        const resolved = text.slice(0, i);
+        const scrambled = text[i] === " " ? " " : chars[Math.floor(Math.random() * chars.length)];
+        setDisplayed(resolved + scrambled);
+        i++;
+      } else {
+        setDisplayed(text);
+        setDone(true);
+        clearInterval(interval);
+      }
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, speed]);
+
   return (
-    <motion.div
-      className="absolute rounded-full bg-primary/20"
-      style={{ left: x, top: y, width: size, height: size }}
-      animate={{
-        y: [0, -30, 0],
-        opacity: [0.2, 0.5, 0.2],
-      }}
-      transition={{
-        duration: 4 + Math.random() * 2,
-        repeat: Infinity,
-        delay,
-        ease: "easeInOut",
-      }}
-    />
+    <span>
+      {displayed}
+      {!done && <span className="animate-blink text-primary">_</span>}
+    </span>
   );
 }
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(false);
+export default function Hero() {
+  const [showMenu, setShowMenu] = useState(false);
+  const shake = useScreenShake();
 
   useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    const onChange = () => setIsMobile(mql.matches);
-    onChange();
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [breakpoint]);
+    const timer = setTimeout(() => setShowMenu(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
-  return isMobile;
-}
-
-export default function Hero() {
-  const isMobile = useIsMobile();
+  const handleButtonClick = useCallback(() => {
+    shake();
+  }, [shake]);
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* 3D Vault Scene (desktop) or gradient fallback (mobile) */}
-      {isMobile ? (
-        /* Static gradient fallback for mobile */
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse at 50% 40%, rgba(37,99,235,0.18) 0%, rgba(217,119,6,0.06) 40%, transparent 70%)",
-          }}
-        />
-      ) : (
-        /* 3D scene — pointer-events-none so it never blocks clicks */
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <VaultScene />
-        </div>
-      )}
-
-      {/* Blueprint grid background */}
+      {/* Arcade grid background */}
       <div
-        className="absolute inset-0 opacity-[0.04]"
+        className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(37, 99, 235, 0.5) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(37, 99, 235, 0.5) 1px, transparent 1px)
+            linear-gradient(rgba(167, 139, 250, 0.6) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(167, 139, 250, 0.6) 1px, transparent 1px)
           `,
-          backgroundSize: "60px 60px",
+          backgroundSize: "48px 48px",
         }}
       />
 
-      {/* Grain texture overlay */}
+      {/* Radial glow behind mascot */}
       <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-20 blur-3xl pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          background: "radial-gradient(circle, rgba(167,139,250,0.3) 0%, transparent 70%)",
         }}
       />
-
-      {/* Radial gradient glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(37,99,235,0.08)_0%,_transparent_70%)]" />
-
-      {/* Floating particles */}
-      <FloatingParticle delay={0} x="15%" y="20%" size={6} />
-      <FloatingParticle delay={1.2} x="80%" y="15%" size={4} />
-      <FloatingParticle delay={0.5} x="65%" y="70%" size={8} />
-      <FloatingParticle delay={2} x="25%" y="75%" size={5} />
-      <FloatingParticle delay={0.8} x="45%" y="30%" size={3} />
-      <FloatingParticle delay={1.5} x="90%" y="55%" size={6} />
-      <FloatingParticle delay={0.3} x="10%" y="50%" size={4} />
-      <FloatingParticle delay={1.8} x="70%" y="85%" size={5} />
 
       {/* Content */}
-      <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
-        <motion.h1
-          className="text-6xl md:text-8xl font-extrabold text-text-primary tracking-tight mb-6"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-        >
-          FYRST
-        </motion.h1>
+      <div className="relative z-10 max-w-2xl mx-auto px-6 text-center">
+        {/* Buster mascot */}
+        <div className="mb-6 flex justify-center">
+          <div className="animate-arcade-bob">
+            <Image
+              src="/images/buster-hero.png"
+              alt="Buster - The Arcade Guardian"
+              width={180}
+              height={180}
+              data-pixel=""
+              className="drop-shadow-[0_0_20px_rgba(167,139,250,0.4)]"
+              style={{ imageRendering: "pixelated" }}
+              priority
+            />
+          </div>
+        </div>
 
-        <motion.p
-          className="text-xl md:text-2xl font-semibold text-primary mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15, ease: "easeOut" }}
-        >
-          Launch safe. Buy confident.
-        </motion.p>
+        {/* Title */}
+        <h1 className="text-xl md:text-3xl font-display text-text-primary tracking-tight mb-2 leading-relaxed">
+          <span className="text-primary neon-text">FYRST</span>
+        </h1>
+        <p className="text-[10px] md:text-xs font-display text-secondary neon-text-subtle mb-8 tracking-widest">
+          THE ANTI-CASINO
+        </p>
 
-        <motion.p
-          className="text-base md:text-lg text-text-secondary max-w-2xl mx-auto mb-10 leading-relaxed"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
-        >
-          The first accountable token launchpad on Solana. Deployer collateral.
-          Cross-wallet reputation. Automatic refunds.
-        </motion.p>
+        {/* Arcade terminal dialogue */}
+        <div className="arcade-border bg-bg-card/90 p-5 md:p-6 text-left mb-8 max-w-lg mx-auto backdrop-blur-sm">
+          <div className="flex items-center gap-2 mb-3 border-b border-border/50 pb-2">
+            <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
+            <span className="text-[8px] font-display text-text-muted tracking-wider">BUSTER_TERMINAL v1.0</span>
+          </div>
+          <p className="text-xs text-text-secondary leading-relaxed font-mono">
+            <span className="text-primary">&gt; </span>
+            <ScrambleText
+              text="Welcome to the Arcade. No rugs, no casino BS. Just pure gameplay. Insert SOL to start."
+              speed={25}
+            />
+          </p>
+        </div>
 
-        <motion.div
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.45, ease: "easeOut" }}
-        >
-          <Link href="/dashboard">
-            <Button variant="primary" size="lg">
-              Browse Launches
-            </Button>
-          </Link>
-          <Link href="/launch">
-            <Button variant="outline" size="lg">
-              Launch Token
-            </Button>
-          </Link>
-        </motion.div>
+        {/* Arcade menu buttons */}
+        {showMenu && (
+          <div className="flex flex-col items-center gap-3 max-w-sm mx-auto">
+            <Link href="/launch" className="w-full animate-slide-in" onClick={handleButtonClick}>
+              <div className="arcade-border bg-secondary/10 border-secondary px-6 py-3.5 flex items-center justify-center gap-3 hover:bg-secondary/20 hover:shadow-[0_0_16px_rgba(251,146,60,0.3)] transition-all cursor-pointer group w-full">
+                <span className="text-[10px] font-display text-secondary animate-blink">[ </span>
+                <span className="text-[10px] font-display text-secondary neon-text-subtle">INSERT COIN (LAUNCH)</span>
+                <span className="text-[10px] font-display text-secondary animate-blink"> ]</span>
+              </div>
+            </Link>
+            <Link href="/dashboard" className="w-full opacity-0 animate-slide-in" style={{ animationDelay: "0.1s" }} onClick={handleButtonClick}>
+              <div className="arcade-border bg-primary/5 border-primary/60 px-6 py-3.5 flex items-center justify-center gap-3 hover:bg-primary/10 hover:shadow-[0_0_16px_rgba(167,139,250,0.3)] transition-all cursor-pointer group w-full">
+                <span className="text-[10px] font-display text-primary">[ </span>
+                <span className="text-[10px] font-display text-primary neon-text-subtle">SELECT PLAYER (BROWSE)</span>
+                <span className="text-[10px] font-display text-primary"> ]</span>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Press start blink */}
+        {!showMenu && (
+          <p className="text-[9px] font-display text-text-muted animate-blink mt-6">
+            LOADING...
+          </p>
+        )}
       </div>
     </section>
   );

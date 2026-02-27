@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { prisma, dbConnected } from "../lib/prisma";
+import { mockStore } from "../lib/mockStore";
 import { logger } from "../utils/logger";
 import { validateBody } from "../middleware/validate";
 import { createTradeSchema } from "../schemas";
@@ -35,13 +36,21 @@ tradeRouter.post(
 
       // ----- Mock mode -----
       if (!dbConnected()) {
-        const mockSupply = 1_000_000;
-        const price = spotPrice(mockSupply);
+        const currentSupply = mockStore.getTokenSupply(tokenMint);
+        const supply = currentSupply || 1_000_000;
         const totalSol =
           side === "buy"
-            ? calculateBuyCost(mockSupply, amount)
-            : calculateSellReturn(mockSupply, amount);
-        const slippage = estimateSlippage(mockSupply, amount, side);
+            ? calculateBuyCost(supply, amount)
+            : calculateSellReturn(supply, amount);
+        const newSupply = side === "buy" ? supply + amount : Math.max(0, supply - amount);
+        const newPrice = spotPrice(newSupply);
+        const slippage = estimateSlippage(supply, amount, side);
+        const newMarketCap = newSupply * newPrice;
+        const progress = calculateProgress(newSupply, newPrice);
+        const graduated = progress >= 100;
+
+        // Update token state in store
+        mockStore.updateTokenAfterTrade(tokenMint, newSupply, newPrice, newMarketCap, progress, graduated);
 
         const mockTrade = {
           id: `mock_${Date.now()}`,
@@ -49,12 +58,29 @@ tradeRouter.post(
           traderAddress,
           side,
           amount,
-          price,
+          price: newPrice,
           totalSol,
-          txSignature: "",
+          txSignature: clientTxSig || `tx_${side}_${Date.now()}`,
           createdAt: new Date().toISOString(),
           slippage,
+          newPrice,
+          newSupply,
+          bondingCurveProgress: progress,
+          graduated,
         };
+
+        mockStore.addTrade(mockTrade);
+
+        // Emit socket events
+        try {
+          const io = getIo();
+          if (io) {
+            io.emit("trade:executed", mockTrade);
+            io.emit("price:update", { tokenMint, price: newPrice, marketCap: newMarketCap, supply: newSupply, bondingCurveProgress: progress });
+          }
+        } catch {
+          // Socket not initialized
+        }
 
         res.status(201).json({ success: true, data: mockTrade });
         return;

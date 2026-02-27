@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { prisma, dbConnected } from "../lib/prisma";
+import { mockStore } from "../lib/mockStore";
 import { logger } from "../utils/logger";
 import { validateBody, validateQuery } from "../middleware/validate";
 import { createLaunchSchema, launchesQuerySchema } from "../schemas";
@@ -33,38 +34,8 @@ launchesRouter.get(
 
       // Fallback mock data when DB is unavailable
       if (!dbConnected()) {
-        const mockTokens = [
-          {
-            mint: "mock_mint_111",
-            name: "MockToken",
-            symbol: "MOCK",
-            description: "A mock token for development",
-            imageUrl: "",
-            deployerAddress: "mock_deployer_111",
-            marketCap: 1000,
-            currentPrice: 0.0001,
-            totalSupply: 10000000,
-            collateralTier: CollateralTier.Bronze,
-            graduated: false,
-            bondingCurveProgress: 5,
-            createdAt: new Date().toISOString(),
-            deployer: {
-              address: "mock_deployer_111",
-              reputationScore: 50,
-              reputationRank: ReputationRank.C,
-              totalLaunches: 1,
-              successfulLaunches: 0,
-              rugPulls: 0,
-              collateralLocked: 1,
-              collateralTier: CollateralTier.Bronze,
-              createdAt: new Date().toISOString(),
-            },
-          },
-        ];
-        res.json({
-          success: true,
-          data: { tokens: mockTokens, total: 1, limit, offset },
-        });
+        const result = mockStore.getTokens(sort, limit, offset);
+        res.json({ success: true, data: result });
         return;
       }
 
@@ -145,26 +116,12 @@ launchesRouter.get(
       const mint = req.params.mint as string;
 
       if (!dbConnected()) {
-        res.json({
-          success: true,
-          data: {
-            mint,
-            name: "MockToken",
-            symbol: "MOCK",
-            description: "Mock token (DB unavailable)",
-            imageUrl: "",
-            deployerAddress: "mock_deployer",
-            marketCap: 0,
-            currentPrice: 0.0001,
-            totalSupply: 0,
-            collateralTier: CollateralTier.Bronze,
-            graduated: false,
-            bondingCurveProgress: 0,
-            createdAt: new Date().toISOString(),
-            deployer: null,
-            tradeCount: 0,
-          },
-        });
+        const token = mockStore.getToken(mint);
+        if (token) {
+          res.json({ success: true, data: token });
+        } else {
+          res.status(404).json({ success: false, error: "Token not found" });
+        }
         return;
       }
 
@@ -254,21 +211,10 @@ launchesRouter.post(
       const mint = clientMint || `mint_${uuidv4().replace(/-/g, "").slice(0, 32)}`;
 
       if (!dbConnected()) {
-        const mockToken = {
-          mint,
-          name,
-          symbol,
-          description,
-          imageUrl,
-          deployerAddress,
-          marketCap: 0,
-          currentPrice: spotPrice(0),
-          totalSupply: 0,
-          collateralTier: tier,
-          graduated: false,
-          bondingCurveProgress: 0,
-          createdAt: new Date().toISOString(),
-        };
+        const mockToken = mockStore.addToken({
+          mint, name, symbol, description, imageUrl, deployerAddress,
+          collateralAmount,
+        });
 
         // Emit socket event
         try {

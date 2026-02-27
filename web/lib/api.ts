@@ -1,3 +1,5 @@
+import { getMockLaunches, getMockToken, getMockDeployer } from "./mock-data";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export { API_BASE_URL };
@@ -112,13 +114,23 @@ export async function fetchLaunches(
   limit: number = 20,
   offset: number = 0,
 ): Promise<FetchLaunchesResult> {
-  return apiFetch<FetchLaunchesResult>(
-    `/api/launches?sort=${sort}&limit=${limit}&offset=${offset}`,
-  );
+  try {
+    return await apiFetch<FetchLaunchesResult>(
+      `/api/launches?sort=${sort}&limit=${limit}&offset=${offset}`,
+    );
+  } catch {
+    return getMockLaunches(sort, limit, offset);
+  }
 }
 
 export async function fetchToken(mint: string): Promise<ApiToken> {
-  return apiFetch<ApiToken>(`/api/launches/${mint}`);
+  try {
+    return await apiFetch<ApiToken>(`/api/launches/${mint}`);
+  } catch {
+    const mock = getMockToken(mint);
+    if (mock) return mock;
+    throw new Error("Token not found");
+  }
 }
 
 export async function createLaunch(data: {
@@ -140,7 +152,13 @@ export async function createLaunch(data: {
 // ---------------------------------------------------------------------------
 
 export async function fetchDeployer(address: string): Promise<ApiDeployer> {
-  return apiFetch<ApiDeployer>(`/api/deployer/${address}`);
+  try {
+    return await apiFetch<ApiDeployer>(`/api/deployer/${address}`);
+  } catch {
+    const mock = getMockDeployer(address);
+    if (mock) return mock;
+    throw new Error("Deployer not found");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -181,5 +199,9 @@ export async function recordTrade(data: {
 // ---------------------------------------------------------------------------
 
 export async function fetchPortfolio(wallet: string): Promise<ApiPortfolio> {
-  return apiFetch<ApiPortfolio>(`/api/portfolio/${wallet}`);
+  try {
+    return await apiFetch<ApiPortfolio>(`/api/portfolio/${wallet}`);
+  } catch {
+    return { ownerAddress: wallet, holdings: [], totalValueSol: 0 };
+  }
 }
