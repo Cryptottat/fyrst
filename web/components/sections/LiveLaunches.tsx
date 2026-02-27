@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { fetchLaunches, type ApiToken } from "@/lib/api";
+import { useAppStore, type PriceSnapshot } from "@/lib/store";
 import {
   formatCompact,
   formatTimeAgo,
@@ -21,6 +22,17 @@ function TokenCard({ token, index }: TokenCardProps) {
   const score = token.deployer?.reputationScore ?? 50;
   const grade = getReputationGrade(score);
   const tier = token.collateralTier || "Bronze";
+  const snapshot: PriceSnapshot | undefined = useAppStore((s) => s.prices.get(token.mint));
+  const liveMcap = snapshot?.marketCap ?? token.marketCap;
+  const liveProgress = snapshot?.bondingCurveProgress ?? token.bondingCurveProgress;
+
+  const changePercent =
+    snapshot && snapshot.previousPrice > 0
+      ? ((snapshot.price - snapshot.previousPrice) / snapshot.previousPrice) * 100
+      : 0;
+  const isRecent = snapshot ? Date.now() - snapshot.updatedAt < 2000 : false;
+  const isUp = changePercent > 0;
+  const isDown = changePercent < 0;
 
   return (
     <Link href={`/token/${token.mint}`}>
@@ -52,14 +64,31 @@ function TokenCard({ token, index }: TokenCardProps) {
           </div>
         </div>
 
-        <ProgressBar value={token.bondingCurveProgress} className="mb-3" />
+        <ProgressBar value={liveProgress} className="mb-3" />
 
         <div className="flex items-center justify-between text-xs">
           <div>
             <span className="text-text-muted font-display text-[8px]">MCap </span>
-            <span className="font-score text-sm text-text-secondary neon-text-subtle">
-              ${formatCompact(token.marketCap)}
+            <span
+              className={`font-score text-sm neon-text-subtle transition-colors duration-500 ${
+                isRecent && isUp
+                  ? "text-success"
+                  : isRecent && isDown
+                    ? "text-error"
+                    : "text-text-secondary"
+              }`}
+            >
+              ${formatCompact(liveMcap)}
             </span>
+            {changePercent !== 0 && (
+              <span
+                className={`ml-1 text-[9px] font-mono ${
+                  isUp ? "text-success" : "text-error"
+                }`}
+              >
+                {isUp ? "+" : ""}{changePercent.toFixed(1)}%
+              </span>
+            )}
           </div>
           <span className="text-[9px] text-text-muted font-mono">
             {formatTimeAgo(token.createdAt)}
@@ -76,19 +105,23 @@ interface LiveLaunchesProps {
 }
 
 export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaunchesProps) {
-  const [tokens, setTokens] = useState<ApiToken[]>([]);
-  const [loading, setLoading] = useState(true);
+  const tokens = useAppStore((s) => s.tokens);
+  const setTokens = useAppStore((s) => s.setTokens);
 
   useEffect(() => {
+    // Only fetch if store is empty (dashboard may have already seeded it)
+    if (tokens.length > 0) return;
+
     fetchLaunches("newest", limit, 0)
       .then((result) => {
         setTokens(result.tokens);
-        setLoading(false);
       })
       .catch(() => {
-        setLoading(false);
+        // silent
       });
-  }, [limit]);
+  }, [limit, tokens.length, setTokens]);
+
+  const display = tokens.slice(0, limit);
 
   return (
     <section className="py-20 px-6">
@@ -113,13 +146,9 @@ export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaun
           )}
         </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-            <div className="text-xs font-display animate-blink">LOADING...</div>
-          </div>
-        ) : tokens.length > 0 ? (
+        {display.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tokens.map((token, i) => (
+            {display.map((token, i) => (
               <TokenCard key={token.mint} token={token} index={i} />
             ))}
           </div>

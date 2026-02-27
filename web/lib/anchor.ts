@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Keypair } from "@solana/web3.js";
+import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import idlJson from "./idl/fyrst.json";
 
@@ -77,7 +77,8 @@ export function useAnchorProgram() {
     if (!provider) return null;
     try {
       return new Program(IDL, provider);
-    } catch {
+    } catch (err) {
+      console.error("Failed to create Anchor Program:", err);
       return null;
     }
   }, [provider]);
@@ -142,7 +143,6 @@ export async function buyTokens(
   solAmountLamports: BN,
 ): Promise<{ txSig: string; recordTxSig: string }> {
   const [bondingCurve] = getCurvePDA(tokenMint);
-  const [buyerRecord] = getBuyerRecordPDA(buyer, tokenMint);
 
   // Fetch current price for record_buyer
   const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve);
@@ -156,6 +156,8 @@ export async function buyTokens(
 
   const methods = program.methods as any;
 
+  const [buyerRecord] = getBuyerRecordPDA(buyer, tokenMint);
+
   const txSig: string = await methods
     .buyTokens(solAmountLamports)
     .accounts({
@@ -163,6 +165,7 @@ export async function buyTokens(
       bondingCurve,
       systemProgram: SystemProgram.programId,
     })
+    .signers([])
     .rpc();
 
   const recordTxSig: string = await methods
@@ -173,6 +176,7 @@ export async function buyTokens(
       buyerRecord,
       systemProgram: SystemProgram.programId,
     })
+    .signers([])
     .rpc();
 
   return { txSig, recordTxSig };

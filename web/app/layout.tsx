@@ -3,6 +3,7 @@ import { Press_Start_2P, DM_Sans, JetBrains_Mono, VT323 } from "next/font/google
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
 import WalletProvider from "@/components/providers/WalletProvider";
+import SocketProvider from "@/components/providers/SocketProvider";
 import "./globals.css";
 
 const pressStart2P = Press_Start_2P({
@@ -48,11 +49,13 @@ export default function RootLayout({
         className={`${pressStart2P.variable} ${dmSans.variable} ${jetbrainsMono.variable} ${vt323.variable} font-sans antialiased bg-bg text-text-primary`}
       >
         <WalletProvider>
-          {/* CRT scanline + vignette overlay */}
-          <div className="crt-overlay" />
-          <Header />
-          <div className="min-h-screen">{children}</div>
-          <Footer />
+          <SocketProvider>
+            {/* CRT scanline + vignette overlay */}
+            <div className="crt-overlay" />
+            <Header />
+            <div className="min-h-screen">{children}</div>
+            <Footer />
+          </SocketProvider>
         </WalletProvider>
       </body>
     </html>

@@ -7,7 +7,9 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
 import BondingCurveChart from "@/components/charts/BondingCurveChart";
-import { fetchToken, fetchDeployer, recordTrade, type ApiToken, type ApiDeployer } from "@/lib/api";
+import { fetchToken, fetchDeployer, fetchTrades, recordTrade, type ApiToken, type ApiDeployer } from "@/lib/api";
+import { useAppStore } from "@/lib/store";
+import { useTokenSubscription } from "@/hooks/useSocket";
 import {
   useAnchorProgram,
   fetchBondingCurve,
@@ -40,6 +42,9 @@ export default function TokenDetailPage({
   const { publicKey, connected } = useWallet();
   const { program } = useAnchorProgram();
 
+  // Subscribe to real-time trade events for this token
+  useTokenSubscription(mint);
+
   const [token, setToken] = useState<ApiToken | null>(null);
   const [deployer, setDeployer] = useState<ApiDeployer | null>(null);
   const [curveData, setCurveData] = useState<BondingCurveData | null>(null);
@@ -53,15 +58,21 @@ export default function TokenDetailPage({
   const [sellStatus, setSellStatus] = useState<TxStatus>("idle");
   const [txError, setTxError] = useState<string | null>(null);
 
+  // Zustand stores
+  const storeTrades = useAppStore((s) => s.trades);
+  const setTrades = useAppStore((s) => s.setTrades);
+  const priceSnapshot = useAppStore((s) => s.prices.get(mint));
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    fetchToken(mint)
-      .then(async (t) => {
+    Promise.all([fetchToken(mint), fetchTrades(mint)])
+      .then(async ([t, tradeData]) => {
         if (cancelled) return;
         setToken(t);
+        setTrades(tradeData);
         if (t.deployerAddress) {
           try {
             const d = await fetchDeployer(t.deployerAddress);
@@ -80,7 +91,7 @@ export default function TokenDetailPage({
       });
 
     return () => { cancelled = true; };
-  }, [mint]);
+  }, [mint, setTrades]);
 
   const refreshOnChainData = useCallback(async () => {
     if (!program) return;
@@ -110,23 +121,14 @@ export default function TokenDetailPage({
     ? curveData.currentSupply.toNumber()
     : null;
 
-  const displayPrice = onChainPrice ?? token?.currentPrice ?? 0;
+  // Priority: live socket price > on-chain > API
+  const displayPrice = priceSnapshot?.price ?? onChainPrice ?? token?.currentPrice ?? 0;
+  const displaySupply = priceSnapshot?.supply ?? onChainSupply ?? token?.totalSupply ?? 0;
 
-  const chartTrades = (() => {
-    const now = Math.floor(Date.now() / 1000);
-    const trades: { time: number; price: number; volume: number }[] = [];
-    for (let i = 0; i < 50; i++) {
-      const time = now - (50 - i) * 300;
-      const baseP = displayPrice * (0.8 + 0.4 * (i / 50));
-      const jitter = (Math.random() - 0.5) * baseP * 0.1;
-      trades.push({
-        time,
-        price: parseFloat(Math.max(0.000001, baseP + jitter).toFixed(6)),
-        volume: Math.random() * 100,
-      });
-    }
-    return trades;
-  })();
+  const refreshTrades = useCallback(async () => {
+    const fresh = await fetchTrades(mint);
+    setTrades(fresh);
+  }, [mint, setTrades]);
 
   const handleBuy = async () => {
     if (!program || !publicKey || !buyAmount) return;
@@ -152,7 +154,7 @@ export default function TokenDetailPage({
 
       setBuyStatus("success");
       setBuyAmount("");
-      await refreshOnChainData();
+      await Promise.all([refreshOnChainData(), refreshTrades()]);
       setTimeout(() => setBuyStatus("idle"), 3000);
     } catch (err: unknown) {
       setBuyStatus("error");
@@ -182,7 +184,7 @@ export default function TokenDetailPage({
 
       setSellStatus("success");
       setSellAmount("");
-      await refreshOnChainData();
+      await Promise.all([refreshOnChainData(), refreshTrades()]);
       setTimeout(() => setSellStatus("idle"), 3000);
     } catch (err: unknown) {
       setSellStatus("error");
@@ -227,9 +229,10 @@ export default function TokenDetailPage({
   const grade = getReputationGrade(score);
   const tier = token.collateralTier || "Bronze";
   const collateralSol = tier === "Diamond" ? 25 : tier === "Gold" ? 10 : tier === "Silver" ? 5 : 1;
-  const progress = curveData
-    ? Math.min(100, Math.floor((curveData.reserveBalance.toNumber() / (69_000 * 1e9)) * 100))
-    : token.bondingCurveProgress;
+  const progress = priceSnapshot?.bondingCurveProgress
+    ?? (curveData
+      ? Math.min(100, Math.floor((curveData.reserveBalance.toNumber() / (69_000 * 1e9)) * 100))
+      : token.bondingCurveProgress);
 
   return (
     <main className="min-h-screen pt-20 pb-16 px-6">
@@ -270,7 +273,7 @@ export default function TokenDetailPage({
             <Card padding="lg">
               <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">PRICE CHART</h3>
               <BondingCurveChart
-                trades={chartTrades}
+                trades={storeTrades}
                 currentPrice={displayPrice}
               />
             </Card>
@@ -285,9 +288,7 @@ export default function TokenDetailPage({
               <Card padding="sm">
                 <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">SUPPLY</p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
-                  {onChainSupply != null
-                    ? formatCompact(onChainSupply)
-                    : formatCompact(token.totalSupply)}
+                  {formatCompact(displaySupply)}
                 </p>
               </Card>
               <Card padding="sm">

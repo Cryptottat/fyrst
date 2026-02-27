@@ -16,6 +16,46 @@ import { getIo } from "../socketManager";
 const tradeRouter = Router();
 
 // ---------------------------------------------------------------------------
+// GET /api/trade/:mint — trade history for a token
+// ---------------------------------------------------------------------------
+
+tradeRouter.get(
+  "/:mint",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mint = req.params.mint as string;
+
+      if (!dbConnected()) {
+        const trades = mockStore.getTradesByMint(mint);
+        res.json({ success: true, data: trades });
+        return;
+      }
+
+      const trades = await prisma.trade.findMany({
+        where: { tokenMint: mint },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const mapped = trades.map((t) => ({
+        id: t.id,
+        tokenMint: t.tokenMint,
+        traderAddress: t.traderAddress,
+        side: t.side,
+        amount: t.amount,
+        price: t.price,
+        totalSol: t.totalSol,
+        txSignature: t.txSignature,
+        createdAt: t.createdAt.toISOString(),
+      }));
+
+      res.json({ success: true, data: mapped });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // POST /api/trade
 // ---------------------------------------------------------------------------
 
@@ -75,7 +115,7 @@ tradeRouter.post(
         try {
           const io = getIo();
           if (io) {
-            io.emit("trade:executed", mockTrade);
+            io.to(`token:${tokenMint}`).emit("trade:executed", mockTrade);
             io.emit("price:update", { tokenMint, price: newPrice, marketCap: newMarketCap, supply: newSupply, bondingCurveProgress: progress });
           }
         } catch {
@@ -230,7 +270,7 @@ tradeRouter.post(
       try {
         const io = getIo();
         if (io) {
-          io.emit("trade:executed", tradeResult);
+          io.to(`token:${tokenMint}`).emit("trade:executed", tradeResult);
           io.emit("price:update", {
             tokenMint,
             price: newPrice,

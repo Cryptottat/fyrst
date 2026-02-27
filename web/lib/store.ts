@@ -1,14 +1,51 @@
 import { create } from "zustand";
 import type { Token } from "@/types";
+import type { ApiToken, ApiTrade } from "@/lib/api";
+
+// ---------------------------------------------------------------------------
+// Price snapshot — tracks previous price for change % calculation
+// ---------------------------------------------------------------------------
+
+export interface PriceSnapshot {
+  price: number;
+  previousPrice: number;
+  marketCap: number;
+  supply: number;
+  bondingCurveProgress: number;
+  updatedAt: number; // Date.now()
+}
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
 
 interface AppState {
   // Active token data
   selectedToken: Token | null;
   setSelectedToken: (token: Token | null) => void;
 
+  // Token list (dashboard / live launches)
+  tokens: ApiToken[];
+  setTokens: (tokens: ApiToken[]) => void;
+  prependToken: (token: ApiToken) => void;
+  updateTokenInList: (mint: string, patch: Partial<ApiToken>) => void;
+
+  // Trades (token detail page)
+  trades: ApiTrade[];
+  setTrades: (trades: ApiTrade[]) => void;
+  appendTrade: (trade: ApiTrade) => void;
+
   // Real-time price feed
-  prices: Map<string, number>;
-  updatePrice: (mint: string, price: number) => void;
+  prices: Map<string, PriceSnapshot>;
+  updatePrice: (
+    mint: string,
+    data: {
+      price: number;
+      marketCap: number;
+      supply: number;
+      bondingCurveProgress: number;
+    },
+  ) => void;
 
   // WebSocket connection status
   wsConnected: boolean;
@@ -26,11 +63,42 @@ export const useAppStore = create<AppState>()((set) => ({
   selectedToken: null,
   setSelectedToken: (token) => set({ selectedToken: token }),
 
-  prices: new Map<string, number>(),
-  updatePrice: (mint, price) =>
+  // -- Tokens ---------------------------------------------------------------
+  tokens: [],
+  setTokens: (tokens) => set({ tokens }),
+  prependToken: (token) =>
+    set((state) => ({
+      tokens: [token, ...state.tokens.filter((t) => t.mint !== token.mint)],
+    })),
+  updateTokenInList: (mint, patch) =>
+    set((state) => ({
+      tokens: state.tokens.map((t) =>
+        t.mint === mint ? { ...t, ...patch } : t,
+      ),
+    })),
+
+  // -- Trades ---------------------------------------------------------------
+  trades: [],
+  setTrades: (trades) => set({ trades }),
+  appendTrade: (trade) =>
+    set((state) => ({
+      trades: [...state.trades, trade],
+    })),
+
+  // -- Prices ---------------------------------------------------------------
+  prices: new Map<string, PriceSnapshot>(),
+  updatePrice: (mint, data) =>
     set((state) => {
       const next = new Map(state.prices);
-      next.set(mint, price);
+      const prev = next.get(mint);
+      next.set(mint, {
+        price: data.price,
+        previousPrice: prev?.price ?? data.price,
+        marketCap: data.marketCap,
+        supply: data.supply,
+        bondingCurveProgress: data.bondingCurveProgress,
+        updatedAt: Date.now(),
+      });
       return { prices: next };
     }),
 

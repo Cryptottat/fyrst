@@ -12,7 +12,6 @@ import { createLaunch } from "@/lib/api";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { BN } from "@coral-xyz/anchor";
-import { Keypair } from "@solana/web3.js";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
 type LaunchStatus = "idle" | "signing" | "confirming" | "recording" | "success" | "error";
@@ -54,28 +53,19 @@ export default function LaunchPage() {
     setTxSigs(null);
 
     try {
-      let mintAddress: string;
-      let escrowSig: string | undefined;
-      let curveSig: string | undefined;
-
-      // Try on-chain launch if program is available
-      if (program) {
-        try {
-          const lamports = new BN(Math.floor(collateral * 1e9));
-          setStatus("confirming");
-          const result = await launchToken(program, publicKey, lamports);
-          mintAddress = result.tokenMintKeypair.publicKey.toBase58();
-          escrowSig = result.escrowTxSig;
-          curveSig = result.curveTxSig;
-          setTxSigs({ escrow: escrowSig, curve: curveSig });
-        } catch {
-          // On-chain program not deployed yet — fall back to API-only demo mode
-          mintAddress = Keypair.generate().publicKey.toBase58();
-        }
-      } else {
-        // No program (wallet just connected, provider not ready) — demo mode
-        mintAddress = Keypair.generate().publicKey.toBase58();
+      if (!program) {
+        setStatus("error");
+        setError("Wallet not ready. Disconnect and reconnect your wallet.");
+        return;
       }
+
+      const lamports = new BN(Math.floor(collateral * 1e9));
+      setStatus("confirming");
+      const result = await launchToken(program, publicKey, lamports);
+      const mintAddress = result.tokenMintKeypair.publicKey.toBase58();
+      const escrowSig = result.escrowTxSig;
+      const curveSig = result.curveTxSig;
+      setTxSigs({ escrow: escrowSig, curve: curveSig });
 
       setStatus("recording");
 

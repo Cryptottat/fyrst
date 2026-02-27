@@ -165,6 +165,26 @@ export async function fetchDeployer(address: string): Promise<ApiDeployer> {
 // Trade
 // ---------------------------------------------------------------------------
 
+export interface ApiTrade {
+  id: string;
+  tokenMint: string;
+  traderAddress: string;
+  side: "buy" | "sell";
+  amount: number;
+  price: number;
+  totalSol: number;
+  txSignature: string;
+  createdAt: string;
+}
+
+export async function fetchTrades(mint: string): Promise<ApiTrade[]> {
+  try {
+    return await apiFetch<ApiTrade[]>(`/api/trade/${mint}`);
+  } catch {
+    return [];
+  }
+}
+
 export interface TradeResult {
   id: string;
   tokenMint: string;

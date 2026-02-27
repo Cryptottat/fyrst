@@ -58,6 +58,7 @@ class MockStore {
 
   constructor() {
     this.seed();
+    this.seedTrades();
   }
 
   private seed() {
@@ -165,6 +166,38 @@ class MockStore {
         createdAt: new Date(now - 0.5 * 3600000).toISOString(),
       },
     ];
+  }
+
+  private seedTrades() {
+    const now = Date.now();
+    // Generate realistic trade history for seed tokens over the past 6 hours
+    for (const token of this.tokens) {
+      const tradeCount = 30 + Math.floor(Math.random() * 40); // 30-70 trades per token
+      const startTime = now - 6 * 3600000;
+      let runningPrice = token.currentPrice * 0.6; // start lower
+
+      for (let i = 0; i < tradeCount; i++) {
+        const time = startTime + (i / tradeCount) * (now - startTime);
+        const side: "buy" | "sell" = Math.random() > 0.35 ? "buy" : "sell";
+        const drift = (i / tradeCount) * 0.4 * token.currentPrice; // upward trend
+        const noise = (Math.random() - 0.5) * token.currentPrice * 0.15;
+        runningPrice = Math.max(0.000001, runningPrice + drift / tradeCount + noise);
+        const amount = Math.floor(1000 + Math.random() * 50000);
+        const totalSol = runningPrice * amount;
+
+        this.trades.push({
+          id: `seed_${token.mint}_${i}`,
+          tokenMint: token.mint,
+          traderAddress: this.deployers[Math.floor(Math.random() * this.deployers.length)].address,
+          side,
+          amount,
+          price: parseFloat(runningPrice.toFixed(9)),
+          totalSol: parseFloat(totalSol.toFixed(9)),
+          txSignature: `seedtx_${token.mint.slice(0, 8)}_${i}`,
+          createdAt: new Date(time).toISOString(),
+        });
+      }
+    }
   }
 
   // ---- Tokens ----
@@ -290,6 +323,12 @@ class MockStore {
 
   addTrade(trade: MockTrade) {
     this.trades.push(trade);
+  }
+
+  getTradesByMint(mint: string): MockTrade[] {
+    return this.trades
+      .filter((t) => t.tokenMint === mint)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   getTokenSupply(mint: string): number {

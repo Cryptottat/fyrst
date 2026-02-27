@@ -1,153 +1,767 @@
 {
   "address": "CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP",
-  "version": "0.1.0",
-  "name": "fyrst",
+  "metadata": {
+    "name": "fyrst",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "FYRST - Responsible Token Launchpad on Solana"
+  },
   "instructions": [
     {
-      "name": "createEscrow",
+      "name": "buy_tokens",
+      "docs": [
+        "Buy tokens on the bonding curve"
+      ],
+      "discriminator": [
+        189,
+        21,
+        230,
+        133,
+        247,
+        2,
+        110,
+        42
+      ],
       "accounts": [
-        { "name": "deployer", "isMut": true, "isSigner": true },
-        { "name": "tokenMint", "isMut": false, "isSigner": false },
-        { "name": "escrowVault", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bonding_curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bonding_curve.token_mint",
+                "account": "BondingCurve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
       "args": [
-        { "name": "collateralAmount", "type": "u64" }
+        {
+          "name": "sol_amount",
+          "type": "u64"
+        }
       ]
     },
     {
-      "name": "releaseEscrow",
+      "name": "create_escrow",
+      "docs": [
+        "Initialize escrow vault for a deployer's token launch"
+      ],
+      "discriminator": [
+        253,
+        215,
+        165,
+        116,
+        36,
+        108,
+        68,
+        80
+      ],
       "accounts": [
-        { "name": "deployer", "isMut": true, "isSigner": true },
-        { "name": "escrowVault", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "deployer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deployer"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "collateral_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "init_bonding_curve",
+      "docs": [
+        "Initialize bonding curve for a token"
+      ],
+      "discriminator": [
+        48,
+        39,
+        212,
+        94,
+        55,
+        52,
+        132,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "deployer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "bonding_curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "base_price",
+          "type": "u64"
+        },
+        {
+          "name": "slope",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "process_refund",
+      "docs": [
+        "Process refund for a buyer (called by protocol authority)"
+      ],
+      "discriminator": [
+        207,
+        200,
+        62,
+        144,
+        204,
+        189,
+        222,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Protocol authority that triggers refunds"
+          ],
+          "signer": true
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "relations": [
+            "buyer_record"
+          ]
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.deployer",
+                "account": "EscrowVault"
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.token_mint",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.token_mint",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
       "args": []
     },
     {
-      "name": "initBondingCurve",
+      "name": "record_buyer",
+      "docs": [
+        "Record a buyer for refund eligibility tracking"
+      ],
+      "discriminator": [
+        214,
+        69,
+        138,
+        169,
+        100,
+        2,
+        136,
+        76
+      ],
       "accounts": [
-        { "name": "deployer", "isMut": true, "isSigner": true },
-        { "name": "tokenMint", "isMut": false, "isSigner": false },
-        { "name": "bondingCurve", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "buyer_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
       "args": [
-        { "name": "basePrice", "type": "u64" },
-        { "name": "slope", "type": "u64" }
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        }
       ]
     },
     {
-      "name": "buyTokens",
-      "accounts": [
-        { "name": "buyer", "isMut": true, "isSigner": true },
-        { "name": "bondingCurve", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      "name": "release_escrow",
+      "docs": [
+        "Release escrow after safe period (deployer reclaims)"
       ],
-      "args": [
-        { "name": "solAmount", "type": "u64" }
-      ]
-    },
-    {
-      "name": "sellTokens",
-      "accounts": [
-        { "name": "seller", "isMut": true, "isSigner": true },
-        { "name": "bondingCurve", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      "discriminator": [
+        146,
+        253,
+        129,
+        233,
+        20,
+        145,
+        181,
+        206
       ],
-      "args": [
-        { "name": "tokenAmount", "type": "u64" }
-      ]
-    },
-    {
-      "name": "recordBuyer",
       "accounts": [
-        { "name": "buyer", "isMut": true, "isSigner": true },
-        { "name": "tokenMint", "isMut": false, "isSigner": false },
-        { "name": "buyerRecord", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
-      ],
-      "args": [
-        { "name": "amount", "type": "u64" },
-        { "name": "price", "type": "u64" }
-      ]
-    },
-    {
-      "name": "processRefund",
-      "accounts": [
-        { "name": "authority", "isMut": false, "isSigner": true },
-        { "name": "buyer", "isMut": true, "isSigner": false },
-        { "name": "escrowVault", "isMut": true, "isSigner": false },
-        { "name": "buyerRecord", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "deployer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "escrow_vault"
+          ]
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deployer"
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.token_mint",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
       ],
       "args": []
+    },
+    {
+      "name": "sell_tokens",
+      "docs": [
+        "Sell tokens on the bonding curve"
+      ],
+      "discriminator": [
+        114,
+        242,
+        25,
+        12,
+        62,
+        126,
+        92,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bonding_curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bonding_curve.token_mint",
+                "account": "BondingCurve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_amount",
+          "type": "u64"
+        }
+      ]
     }
   ],
   "accounts": [
     {
-      "name": "EscrowVault",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          { "name": "deployer", "type": "publicKey" },
-          { "name": "tokenMint", "type": "publicKey" },
-          { "name": "collateralAmount", "type": "u64" },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "released", "type": "bool" },
-          { "name": "rugged", "type": "bool" },
-          { "name": "bump", "type": "u8" }
-        ]
-      }
+      "name": "BondingCurve",
+      "discriminator": [
+        23,
+        183,
+        248,
+        55,
+        96,
+        216,
+        172,
+        96
+      ]
     },
     {
+      "name": "BuyerRecord",
+      "discriminator": [
+        107,
+        122,
+        54,
+        31,
+        4,
+        54,
+        209,
+        38
+      ]
+    },
+    {
+      "name": "EscrowVault",
+      "discriminator": [
+        54,
+        84,
+        41,
+        149,
+        160,
+        181,
+        85,
+        114
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InsufficientCollateral",
+      "msg": "Collateral amount is below minimum (1 SOL)"
+    },
+    {
+      "code": 6001,
+      "name": "SafePeriodActive",
+      "msg": "Safe period has not ended yet"
+    },
+    {
+      "code": 6002,
+      "name": "SafePeriodExpired",
+      "msg": "Safe period has already ended"
+    },
+    {
+      "code": 6003,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: not the escrow owner"
+    },
+    {
+      "code": 6004,
+      "name": "EscrowAlreadyReleased",
+      "msg": "Escrow is already released"
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient SOL for purchase"
+    },
+    {
+      "code": 6006,
+      "name": "InsufficientTokens",
+      "msg": "Insufficient tokens for sale"
+    },
+    {
+      "code": 6007,
+      "name": "AlreadyGraduated",
+      "msg": "Bonding curve already graduated"
+    },
+    {
+      "code": 6008,
+      "name": "RefundAlreadyProcessed",
+      "msg": "Refund already processed"
+    },
+    {
+      "code": 6009,
+      "name": "NoBuyerRecord",
+      "msg": "No buyer record found"
+    },
+    {
+      "code": 6010,
+      "name": "MathOverflow",
+      "msg": "Math overflow"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidPrice",
+      "msg": "Invalid price calculation"
+    }
+  ],
+  "types": [
+    {
       "name": "BondingCurve",
+      "docs": [
+        "Bonding curve state for a token"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "tokenMint", "type": "publicKey" },
-          { "name": "currentSupply", "type": "u64" },
-          { "name": "basePrice", "type": "u64" },
-          { "name": "slope", "type": "u64" },
-          { "name": "reserveBalance", "type": "u64" },
-          { "name": "graduated", "type": "bool" },
-          { "name": "deployer", "type": "publicKey" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "current_supply",
+            "docs": [
+              "Current supply of tokens sold via the curve"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "base_price",
+            "docs": [
+              "Base price in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "slope",
+            "docs": [
+              "Price slope (price increase per token)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reserve_balance",
+            "docs": [
+              "Total SOL reserve in the curve"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "graduated",
+            "docs": [
+              "Whether the token has graduated (hit bonding curve cap)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "deployer",
+            "docs": [
+              "Deployer address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA"
+            ],
+            "type": "u8"
+          }
         ]
       }
     },
     {
       "name": "BuyerRecord",
+      "docs": [
+        "Buyer record for refund eligibility"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "buyer", "type": "publicKey" },
-          { "name": "tokenMint", "type": "publicKey" },
-          { "name": "totalBought", "type": "u64" },
-          { "name": "totalSolSpent", "type": "u64" },
-          { "name": "avgPrice", "type": "u64" },
-          { "name": "refundClaimed", "type": "bool" },
-          { "name": "firstBuyAt", "type": "i64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "buyer",
+            "docs": [
+              "Buyer wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "total_bought",
+            "docs": [
+              "Total tokens bought"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_sol_spent",
+            "docs": [
+              "Total SOL spent"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "avg_price",
+            "docs": [
+              "Average buy price in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "refund_claimed",
+            "docs": [
+              "Whether refund has been claimed"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "first_buy_at",
+            "docs": [
+              "Timestamp of first purchase"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowVault",
+      "docs": [
+        "Escrow vault account storing deployer collateral"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "deployer",
+            "docs": [
+              "Deployer wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "docs": [
+              "Token mint address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_amount",
+            "docs": [
+              "Collateral amount in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "Timestamp when escrow was created"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "released",
+            "docs": [
+              "Whether the escrow has been released back to deployer"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "rugged",
+            "docs": [
+              "Whether a rug was detected (triggers refund mode)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA"
+            ],
+            "type": "u8"
+          }
         ]
       }
     }
-  ],
-  "errors": [
-    { "code": 6000, "name": "InsufficientCollateral", "msg": "Collateral amount is below minimum (1 SOL)" },
-    { "code": 6001, "name": "SafePeriodActive", "msg": "Safe period has not ended yet" },
-    { "code": 6002, "name": "SafePeriodExpired", "msg": "Safe period has already ended" },
-    { "code": 6003, "name": "Unauthorized", "msg": "Unauthorized: not the escrow owner" },
-    { "code": 6004, "name": "EscrowAlreadyReleased", "msg": "Escrow is already released" },
-    { "code": 6005, "name": "InsufficientFunds", "msg": "Insufficient SOL for purchase" },
-    { "code": 6006, "name": "InsufficientTokens", "msg": "Insufficient tokens for sale" },
-    { "code": 6007, "name": "AlreadyGraduated", "msg": "Bonding curve already graduated" },
-    { "code": 6008, "name": "RefundAlreadyProcessed", "msg": "Refund already processed" },
-    { "code": 6009, "name": "NoBuyerRecord", "msg": "No buyer record found" },
-    { "code": 6010, "name": "MathOverflow", "msg": "Math overflow" },
-    { "code": 6011, "name": "InvalidPrice", "msg": "Invalid price calculation" }
-  ],
-  "metadata": {
-    "address": "CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP"
-  }
+  ]
 }

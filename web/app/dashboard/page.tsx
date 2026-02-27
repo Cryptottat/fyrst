@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { fetchLaunches, type ApiToken } from "@/lib/api";
+import { useAppStore, type PriceSnapshot } from "@/lib/store";
 import {
   formatCompact,
   formatTimeAgo,
@@ -15,10 +16,50 @@ import { Search } from "lucide-react";
 
 type SortKey = "newest" | "marketCap" | "reputation";
 
+function PriceFlash({ snapshot, fallbackMcap }: { snapshot: PriceSnapshot | undefined; fallbackMcap: number }) {
+  const mcap = snapshot?.marketCap ?? fallbackMcap;
+  const changePercent =
+    snapshot && snapshot.previousPrice > 0
+      ? ((snapshot.price - snapshot.previousPrice) / snapshot.previousPrice) * 100
+      : 0;
+
+  const isRecent = snapshot ? Date.now() - snapshot.updatedAt < 2000 : false;
+  const isUp = changePercent > 0;
+  const isDown = changePercent < 0;
+
+  return (
+    <div className="text-right shrink-0 w-28">
+      <p
+        className={`text-sm font-score neon-text-subtle transition-colors duration-500 ${
+          isRecent && isUp
+            ? "text-success"
+            : isRecent && isDown
+              ? "text-error"
+              : "text-text-primary"
+        }`}
+      >
+        ${formatCompact(mcap)}
+      </p>
+      {changePercent !== 0 && (
+        <p
+          className={`text-[9px] font-mono ${
+            isUp ? "text-success" : "text-error"
+          }`}
+        >
+          {isUp ? "+" : ""}
+          {changePercent.toFixed(2)}%
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TokenRow({ token, index }: { token: ApiToken; index: number }) {
   const score = token.deployer?.reputationScore ?? 50;
   const grade = getReputationGrade(score);
   const tier = token.collateralTier || "Bronze";
+  const snapshot = useAppStore((s) => s.prices.get(token.mint));
+  const liveProgress = snapshot?.bondingCurveProgress ?? token.bondingCurveProgress;
 
   return (
     <Link href={`/token/${token.mint}`}>
@@ -51,13 +92,12 @@ function TokenRow({ token, index }: { token: ApiToken; index: number }) {
         </div>
 
         <div className="w-28 shrink-0">
-          <ProgressBar value={token.bondingCurveProgress} />
+          <ProgressBar value={liveProgress} />
         </div>
 
-        <div className="text-right shrink-0 w-24">
-          <p className="text-sm font-score text-text-primary neon-text-subtle">
-            ${formatCompact(token.marketCap)}
-          </p>
+        <PriceFlash snapshot={snapshot} fallbackMcap={token.marketCap} />
+
+        <div className="text-right shrink-0 w-16">
           <p className="text-[9px] text-text-muted font-mono">
             {formatTimeAgo(token.createdAt)}
           </p>
@@ -70,9 +110,11 @@ function TokenRow({ token, index }: { token: ApiToken; index: number }) {
 export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const tokens = useAppStore((s) => s.tokens);
+  const setTokens = useAppStore((s) => s.setTokens);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +136,7 @@ export default function DashboardPage() {
       });
 
     return () => { cancelled = true; };
-  }, [sort]);
+  }, [sort, setTokens]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return tokens;

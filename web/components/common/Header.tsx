@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/lib/store";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Menu, X } from "lucide-react";
 
@@ -16,6 +17,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const wsConnected = useAppStore((s) => s.wsConnected);
 
   useEffect(() => {
     setMounted(true);
@@ -36,13 +38,26 @@ export default function Header() {
       )}
     >
       <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-        {/* Logo */}
-        <Link
-          href="/"
-          className="text-xs font-display text-primary hover:text-primary/80 transition-colors neon-text-subtle"
-        >
-          FYRST
-        </Link>
+        {/* Logo + WS status */}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="text-xs font-display text-primary hover:text-primary/80 transition-colors neon-text-subtle"
+          >
+            FYRST
+          </Link>
+          {mounted && (
+            <span
+              className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                wsConnected
+                  ? "bg-success animate-pulse"
+                  : "bg-error",
+              )}
+              title={wsConnected ? "Live" : "Disconnected"}
+            />
+          )}
+        </div>
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-8">
