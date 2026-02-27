@@ -12,6 +12,7 @@ import { createLaunch } from "@/lib/api";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { BN } from "@coral-xyz/anchor";
+import { processImage } from "@/lib/image";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
 type LaunchStatus = "idle" | "signing" | "confirming" | "recording" | "success" | "error";
@@ -149,12 +150,15 @@ export default function LaunchPage() {
                     accept="image/*"
                     className="hidden"
                     disabled={isProcessing}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = () => setImageUrl(reader.result as string);
-                        reader.readAsDataURL(file);
+                      if (!file) return;
+                      try {
+                        const dataUrl = await processImage(file);
+                        setImageUrl(dataUrl);
+                        setError(null);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Image processing failed");
                       }
                     }}
                   />
