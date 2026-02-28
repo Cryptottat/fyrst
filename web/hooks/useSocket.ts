@@ -20,6 +20,7 @@ export function useSocketInit() {
   const updatePrice = useAppStore((s) => s.updatePrice);
   const prependToken = useAppStore((s) => s.prependToken);
   const updateTokenInList = useAppStore((s) => s.updateTokenInList);
+  const setSolPrice = useAppStore((s) => s.setSolPrice);
   const initRef = useRef(false);
 
   useEffect(() => {
@@ -39,6 +40,13 @@ export function useSocketInit() {
     // Global: new token launched
     socket.on("launch:new", (payload: LaunchNewPayload) => {
       prependToken(payload);
+    });
+
+    // Global: heartbeat (extract solPrice if present)
+    socket.on("heartbeat", (payload: { timestamp: string; solPrice?: number }) => {
+      if (payload.solPrice != null && payload.solPrice > 0) {
+        setSolPrice(payload.solPrice);
+      }
     });
 
     // Global: price update (broadcast for dashboard)
@@ -65,11 +73,12 @@ export function useSocketInit() {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("launch:new");
+      socket.off("heartbeat");
       socket.off("price:update");
       socket.disconnect();
       initRef.current = false;
     };
-  }, [setWsConnected, updatePrice, prependToken, updateTokenInList]);
+  }, [setWsConnected, updatePrice, prependToken, updateTokenInList, setSolPrice]);
 }
 
 // ---------------------------------------------------------------------------

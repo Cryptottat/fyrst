@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { fetchLaunches, type ApiToken } from "@/lib/api";
@@ -107,18 +106,24 @@ interface LiveLaunchesProps {
 export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaunchesProps) {
   const tokens = useAppStore((s) => s.tokens);
   const setTokens = useAppStore((s) => s.setTokens);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    // Only fetch if store is empty (dashboard may have already seeded it)
-    if (tokens.length > 0) return;
-
+  const doFetch = () => {
+    setError(false);
     fetchLaunches("newest", limit, 0)
       .then((result) => {
         setTokens(result.tokens);
       })
       .catch(() => {
-        // silent
+        setError(true);
       });
+  };
+
+  useEffect(() => {
+    // Only fetch if store is empty (dashboard may have already seeded it)
+    if (tokens.length > 0) return;
+    doFetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit, tokens.length, setTokens]);
 
   const display = tokens.slice(0, limit);
@@ -146,7 +151,19 @@ export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaun
           )}
         </div>
 
-        {display.length > 0 ? (
+        {error ? (
+          <div className="text-center py-16">
+            <p className="text-[10px] font-display text-error mb-4 animate-blink">
+              CONNECTION ERROR
+            </p>
+            <button
+              onClick={doFetch}
+              className="text-[9px] font-display text-primary hover:text-primary/80 transition-colors border border-primary px-4 py-2"
+            >
+              [ RETRY ]
+            </button>
+          </div>
+        ) : display.length > 0 ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {display.map((token, i) => (
               <TokenCard key={token.mint} token={token} index={i} />
@@ -154,9 +171,15 @@ export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaun
           </div>
         ) : (
           <div className="text-center py-16">
-            <p className="text-[10px] font-display text-text-muted animate-blink">
+            <p className="text-[10px] font-display text-text-muted animate-blink mb-4">
               NO CHALLENGERS YET. BE THE FIRST!
             </p>
+            <Link
+              href="/launch"
+              className="text-[9px] font-display text-primary hover:text-primary/80 transition-colors border border-primary px-4 py-2"
+            >
+              [ LAUNCH TOKEN ]
+            </Link>
           </div>
         )}
       </div>

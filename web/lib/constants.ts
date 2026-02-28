@@ -63,7 +63,7 @@ export const COLLATERAL_TIERS = [
 ] as const;
 
 /** Minimum collateral in SOL required to launch a token */
-export const MIN_COLLATERAL = 1;
+export const MIN_COLLATERAL = 0.01;
 
 /** Safe period duration in seconds (24 hours) */
 export const SAFE_PERIOD = 24 * 60 * 60;

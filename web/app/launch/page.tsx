@@ -61,8 +61,17 @@ export default function LaunchPage() {
       }
 
       const lamports = new BN(Math.floor(collateral * 1e9));
+      // On-chain URI max 200 chars — data URLs are too large, use empty string
+      const onChainUri = imageUrl.startsWith("data:") ? "" : imageUrl.trim();
       setStatus("confirming");
-      const result = await launchToken(program, publicKey, lamports);
+      const result = await launchToken(
+        program,
+        publicKey,
+        lamports,
+        name.trim(),
+        symbol.trim().toUpperCase(),
+        onChainUri,
+      );
       const mintAddress = result.tokenMintKeypair.publicKey.toBase58();
       const escrowSig = result.escrowTxSig;
       const curveSig = result.curveTxSig;
@@ -263,7 +272,7 @@ export default function LaunchPage() {
               </Button>
               <p className="text-[9px] text-text-muted text-center mt-3 font-mono">
                 <span className="text-primary">&gt; </span>
-                {connected ? "Creates escrow + bonding curve on devnet." : "Connect wallet first."}
+                {connected ? `Creates escrow + bonding curve on ${process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet"}.` : "Connect wallet first."}
               </p>
             </div>
           </form>

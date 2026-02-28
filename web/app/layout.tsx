@@ -36,6 +36,25 @@ export const metadata: Metadata = {
   title: "FYRST - The Anti-Casino",
   description:
     "FYRST: The Anti-Casino. No rugs, no casino BS. A Solana token launchpad with deployer collateral, cross-wallet reputation, and auto refunds.",
+  openGraph: {
+    title: "FYRST — The Anti-Casino",
+    description: "Launch safe. Buy confident. The responsible token launchpad on Solana.",
+    url: "https://fyrst.fun",
+    siteName: "FYRST",
+    images: [{ url: "/images/og.png", width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FYRST — The Anti-Casino",
+    description: "Launch safe. Buy confident.",
+    creator: "@fyrstfun",
+    images: ["/images/og.png"],
+  },
+  icons: {
+    icon: "/images/favicon-f-arcade.png",
+    apple: "/images/favicon-f-arcade.png",
+  },
 };
 
 export default function RootLayout({

@@ -51,6 +51,10 @@ interface AppState {
   wsConnected: boolean;
   setWsConnected: (connected: boolean) => void;
 
+  // SOL price (from heartbeat)
+  solPrice: number;
+  setSolPrice: (price: number) => void;
+
   // Feature flags from env
   features: {
     trading: boolean;
@@ -104,6 +108,9 @@ export const useAppStore = create<AppState>()((set) => ({
 
   wsConnected: false,
   setWsConnected: (connected) => set({ wsConnected: connected }),
+
+  solPrice: 0,
+  setSolPrice: (price) => set({ solPrice: price }),
 
   features: {
     trading: process.env.NEXT_PUBLIC_FEATURE_TRADING !== "false",

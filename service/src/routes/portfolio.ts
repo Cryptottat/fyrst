@@ -17,16 +17,7 @@ portfolioRouter.get(
       const wallet = req.params.wallet as string;
 
       if (!dbConnected()) {
-        // Mock empty portfolio
-        res.json({
-          success: true,
-          data: {
-            ownerAddress: wallet,
-            holdings: [],
-            totalValueSol: 0,
-          },
-        });
-        return;
+        return res.status(503).json({ error: "Database unavailable" });
       }
 
       // Fetch all buyer records for this wallet with token info

@@ -1,5 +1,5 @@
-/// Minimum collateral in lamports (1 SOL = 1_000_000_000 lamports)
-pub const MIN_COLLATERAL: u64 = 1_000_000_000;
+/// Minimum collateral in lamports (0.01 SOL = 10_000_000 lamports)
+pub const MIN_COLLATERAL: u64 = 10_000_000;
 
 /// Safe period in seconds (24 hours)
 pub const SAFE_PERIOD: i64 = 24 * 60 * 60;
@@ -24,3 +24,12 @@ pub const BUYER_SEED: &[u8] = b"record";
 
 /// Basis points denominator
 pub const BPS_DENOMINATOR: u64 = 10_000;
+
+/// Protocol config PDA seed
+pub const PROTOCOL_SEED: &[u8] = b"protocol";
+
+/// Graduation threshold in lamports (85 SOL — pump.fun model)
+pub const GRADUATION_THRESHOLD: u64 = 85_000_000_000;
+
+/// Token decimals for SPL tokens
+pub const TOKEN_DECIMALS: u8 = 6;

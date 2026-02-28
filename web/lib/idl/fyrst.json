@@ -10,7 +10,7 @@
     {
       "name": "buy_tokens",
       "docs": [
-        "Buy tokens on the bonding curve"
+        "Buy tokens on the bonding curve (mints SPL tokens)"
       ],
       "discriminator": [
         189,
@@ -50,6 +50,132 @@
               }
             ]
           }
+        },
+        {
+          "name": "token_mint",
+          "writable": true
+        },
+        {
+          "name": "buyer_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "buyer"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
           "name": "system_program",
@@ -127,9 +253,75 @@
       ]
     },
     {
+      "name": "graduate",
+      "docs": [
+        "Graduate a bonding curve when reserve meets threshold"
+      ],
+      "discriminator": [
+        45,
+        235,
+        225,
+        181,
+        17,
+        218,
+        64,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "bonding_curve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bonding_curve.token_mint",
+                "account": "BondingCurve"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "init_bonding_curve",
       "docs": [
-        "Initialize bonding curve for a token"
+        "Initialize bonding curve with SPL token mint + metadata"
       ],
       "discriminator": [
         48,
@@ -148,7 +340,9 @@
           "signer": true
         },
         {
-          "name": "token_mint"
+          "name": "token_mint",
+          "writable": true,
+          "signer": true
         },
         {
           "name": "bonding_curve",
@@ -173,8 +367,24 @@
           }
         },
         {
+          "name": "metadata_account",
+          "writable": true
+        },
+        {
+          "name": "metadata_program",
+          "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
         }
       ],
       "args": [
@@ -185,13 +395,151 @@
         {
           "name": "slope",
           "type": "u64"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "uri",
+          "type": "string"
         }
       ]
     },
     {
+      "name": "init_protocol",
+      "docs": [
+        "Initialize protocol configuration (one-time setup)"
+      ],
+      "discriminator": [
+        3,
+        188,
+        141,
+        237,
+        225,
+        226,
+        232,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "mark_rugged",
+      "docs": [
+        "Mark a token as rugged (authority only)"
+      ],
+      "discriminator": [
+        18,
+        247,
+        55,
+        57,
+        159,
+        189,
+        240,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.deployer",
+                "account": "EscrowVault"
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.token_mint",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "process_refund",
       "docs": [
-        "Process refund for a buyer (called by protocol authority)"
+        "Process pro-rata refund for a buyer (called by protocol authority)"
       ],
       "discriminator": [
         207,
@@ -219,6 +567,26 @@
           ]
         },
         {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "escrow_vault",
           "writable": true,
           "pda": {
@@ -238,6 +606,28 @@
                 "kind": "account",
                 "path": "escrow_vault.deployer",
                 "account": "EscrowVault"
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.token_mint",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bonding_curve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
               },
               {
                 "kind": "account",
@@ -411,7 +801,7 @@
     {
       "name": "sell_tokens",
       "docs": [
-        "Sell tokens on the bonding curve"
+        "Sell tokens on the bonding curve (burns SPL tokens)"
       ],
       "discriminator": [
         114,
@@ -451,6 +841,104 @@
               }
             ]
           }
+        },
+        {
+          "name": "token_mint",
+          "writable": true
+        },
+        {
+          "name": "seller_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "seller"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "system_program",
@@ -503,6 +991,19 @@
         181,
         85,
         114
+      ]
+    },
+    {
+      "name": "ProtocolConfig",
+      "discriminator": [
+        207,
+        91,
+        250,
+        28,
+        152,
+        179,
+        215,
+        209
       ]
     }
   ],
@@ -566,6 +1067,26 @@
       "code": 6011,
       "name": "InvalidPrice",
       "msg": "Invalid price calculation"
+    },
+    {
+      "code": 6012,
+      "name": "TokenIsRugged",
+      "msg": "Token has been rugged — escrow release blocked"
+    },
+    {
+      "code": 6013,
+      "name": "EscrowIsRugged",
+      "msg": "Escrow is already marked as rugged"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidMetadata",
+      "msg": "Invalid metadata: name/symbol/URI exceeds length limit"
+    },
+    {
+      "code": 6015,
+      "name": "TokenMintMismatch",
+      "msg": "Token mint does not match bonding curve"
     }
   ],
   "types": [
@@ -625,6 +1146,13 @@
               "Deployer address"
             ],
             "type": "pubkey"
+          },
+          {
+            "name": "total_sol_collected",
+            "docs": [
+              "Total SOL ever collected (for pro-rata refund denominator, never decreases)"
+            ],
+            "type": "u64"
           },
           {
             "name": "bump",
@@ -752,6 +1280,45 @@
               "Whether a rug was detected (triggers refund mode)"
             ],
             "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for PDA"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolConfig",
+      "docs": [
+        "Protocol configuration (singleton PDA)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Authority that can call mark_rugged"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "docs": [
+              "Treasury wallet for protocol fee collection"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "graduation_threshold",
+            "docs": [
+              "Graduation threshold in lamports"
+            ],
+            "type": "u64"
           },
           {
             "name": "bump",

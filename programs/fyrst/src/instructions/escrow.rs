@@ -50,6 +50,7 @@ pub fn release_escrow(ctx: Context<ReleaseEscrow>) -> Result<()> {
         let escrow = &mut ctx.accounts.escrow_vault;
 
         require!(!escrow.released, FyrstError::EscrowAlreadyReleased);
+        require!(!escrow.rugged, FyrstError::TokenIsRugged);
         require!(
             ctx.accounts.deployer.key() == escrow.deployer,
             FyrstError::Unauthorized

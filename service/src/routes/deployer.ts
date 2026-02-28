@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { prisma, dbConnected } from "../lib/prisma";
-import { mockStore } from "../lib/mockStore";
 import { logger } from "../utils/logger";
 import { calculateReputationScore } from "../services/reputation";
 import { CollateralTier, ReputationRank } from "../types";
@@ -18,9 +17,7 @@ deployerRouter.get(
       const address = req.params.address as string;
 
       if (!dbConnected()) {
-        const deployer = mockStore.getDeployer(address);
-        res.json({ success: true, data: deployer });
-        return;
+        return res.status(503).json({ error: "Database unavailable" });
       }
 
       const deployer = await prisma.deployer.findUnique({

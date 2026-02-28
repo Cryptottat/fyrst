@@ -5,13 +5,13 @@ import Link from "next/link";
 const footerLinks = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Launch", href: "/launch" },
-  { label: "Docs", href: "#" },
+  { label: "Docs", href: "https://github.com/fyrst-fun/fyrst#readme" },
 ];
 
 const socialLinks = [
-  { label: "X", href: "https://x.com/fyrstprotocol" },
-  { label: "GitHub", href: "https://github.com/fyrst-protocol" },
-  { label: "Telegram", href: "https://t.me/fyrstprotocol" },
+  { label: "X", href: "https://x.com/fyrstfun" },
+  { label: "GitHub", href: "https://github.com/fyrst-fun" },
+  { label: "Telegram", href: "https://t.me/fyrstfun" },
 ];
 
 export default function Footer() {

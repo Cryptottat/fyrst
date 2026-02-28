@@ -37,4 +37,16 @@ pub enum FyrstError {
 
     #[msg("Invalid price calculation")]
     InvalidPrice,
+
+    #[msg("Token has been rugged — escrow release blocked")]
+    TokenIsRugged,
+
+    #[msg("Escrow is already marked as rugged")]
+    EscrowIsRugged,
+
+    #[msg("Invalid metadata: name/symbol/URI exceeds length limit")]
+    InvalidMetadata,
+
+    #[msg("Token mint does not match bonding curve")]
+    TokenMintMismatch,
 }

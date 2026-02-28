@@ -6,13 +6,13 @@ import { prisma, dbConnected } from "../lib/prisma";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MINIMUM_COLLATERAL_SOL = 1;
+const MINIMUM_COLLATERAL_SOL = 0.01;
 
 const TIER_THRESHOLDS: { min: number; tier: CollateralTier }[] = [
   { min: 25, tier: CollateralTier.Diamond },
   { min: 10, tier: CollateralTier.Gold },
   { min: 5, tier: CollateralTier.Silver },
-  { min: 1, tier: CollateralTier.Bronze },
+  { min: 0.01, tier: CollateralTier.Bronze },
 ];
 
 // ---------------------------------------------------------------------------

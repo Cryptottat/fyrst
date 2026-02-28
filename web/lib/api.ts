@@ -1,5 +1,3 @@
-import { getMockLaunches, getMockToken, getMockDeployer } from "./mock-data";
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export { API_BASE_URL };
@@ -114,23 +112,13 @@ export async function fetchLaunches(
   limit: number = 20,
   offset: number = 0,
 ): Promise<FetchLaunchesResult> {
-  try {
-    return await apiFetch<FetchLaunchesResult>(
-      `/api/launches?sort=${sort}&limit=${limit}&offset=${offset}`,
-    );
-  } catch {
-    return getMockLaunches(sort, limit, offset);
-  }
+  return apiFetch<FetchLaunchesResult>(
+    `/api/launches?sort=${sort}&limit=${limit}&offset=${offset}`,
+  );
 }
 
 export async function fetchToken(mint: string): Promise<ApiToken> {
-  try {
-    return await apiFetch<ApiToken>(`/api/launches/${mint}`);
-  } catch {
-    const mock = getMockToken(mint);
-    if (mock) return mock;
-    throw new Error("Token not found");
-  }
+  return apiFetch<ApiToken>(`/api/launches/${mint}`);
 }
 
 export async function createLaunch(data: {
@@ -152,13 +140,7 @@ export async function createLaunch(data: {
 // ---------------------------------------------------------------------------
 
 export async function fetchDeployer(address: string): Promise<ApiDeployer> {
-  try {
-    return await apiFetch<ApiDeployer>(`/api/deployer/${address}`);
-  } catch {
-    const mock = getMockDeployer(address);
-    if (mock) return mock;
-    throw new Error("Deployer not found");
-  }
+  return apiFetch<ApiDeployer>(`/api/deployer/${address}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,4 +206,20 @@ export async function fetchPortfolio(wallet: string): Promise<ApiPortfolio> {
   } catch {
     return { ownerAddress: wallet, holdings: [], totalValueSol: 0 };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Stats
+// ---------------------------------------------------------------------------
+
+export async function fetchStats(): Promise<{
+  totalLaunches: number;
+  totalTrades: number;
+  graduatedCount: number;
+  totalVolumeSol: number;
+  refundsSaved: number;
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/stats`);
+  if (!res.ok) throw new Error("Failed to fetch stats");
+  return res.json();
 }

@@ -1,6 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { prisma, dbConnected } from "../lib/prisma";
-import { mockStore } from "../lib/mockStore";
 import { logger } from "../utils/logger";
 import { validateBody } from "../middleware/validate";
 import { createTradeSchema } from "../schemas";
@@ -26,9 +25,7 @@ tradeRouter.get(
       const mint = req.params.mint as string;
 
       if (!dbConnected()) {
-        const trades = mockStore.getTradesByMint(mint);
-        res.json({ success: true, data: trades });
-        return;
+        return res.status(503).json({ error: "Database unavailable" });
       }
 
       const trades = await prisma.trade.findMany({
@@ -74,56 +71,8 @@ tradeRouter.post(
         price?: number;
       };
 
-      // ----- Mock mode -----
       if (!dbConnected()) {
-        const currentSupply = mockStore.getTokenSupply(tokenMint);
-        const supply = currentSupply || 1_000_000;
-        const totalSol =
-          side === "buy"
-            ? calculateBuyCost(supply, amount)
-            : calculateSellReturn(supply, amount);
-        const newSupply = side === "buy" ? supply + amount : Math.max(0, supply - amount);
-        const newPrice = spotPrice(newSupply);
-        const slippage = estimateSlippage(supply, amount, side);
-        const newMarketCap = newSupply * newPrice;
-        const progress = calculateProgress(newSupply, newPrice);
-        const graduated = progress >= 100;
-
-        // Update token state in store
-        mockStore.updateTokenAfterTrade(tokenMint, newSupply, newPrice, newMarketCap, progress, graduated);
-
-        const mockTrade = {
-          id: `mock_${Date.now()}`,
-          tokenMint,
-          traderAddress,
-          side,
-          amount,
-          price: newPrice,
-          totalSol,
-          txSignature: clientTxSig || `tx_${side}_${Date.now()}`,
-          createdAt: new Date().toISOString(),
-          slippage,
-          newPrice,
-          newSupply,
-          bondingCurveProgress: progress,
-          graduated,
-        };
-
-        mockStore.addTrade(mockTrade);
-
-        // Emit socket events
-        try {
-          const io = getIo();
-          if (io) {
-            io.to(`token:${tokenMint}`).emit("trade:executed", mockTrade);
-            io.emit("price:update", { tokenMint, price: newPrice, marketCap: newMarketCap, supply: newSupply, bondingCurveProgress: progress });
-          }
-        } catch {
-          // Socket not initialized
-        }
-
-        res.status(201).json({ success: true, data: mockTrade });
-        return;
+        return res.status(503).json({ error: "Database unavailable" });
       }
 
       // ----- DB mode -----

@@ -4,7 +4,9 @@ import { app } from "./app";
 import { config } from "./config";
 import { logger } from "./utils/logger";
 import { setIo } from "./socketManager";
-import { connectDb, seedIfEmpty } from "./lib/prisma";
+import { connectDb } from "./lib/prisma";
+import { connectRedis } from "./lib/redis";
+import { initQueues } from "./lib/queues";
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -38,13 +40,44 @@ io.on("connection", (socket) => {
 });
 
 // ---------------------------------------------------------------------------
-// Periodic price broadcast (every 10 seconds)
+// SOL price helper
 // ---------------------------------------------------------------------------
 
-setInterval(() => {
-  // TODO (Phase 6): Fetch live prices from on-chain data and broadcast
-  // For now this is a heartbeat so clients know the connection is alive
-  io.emit("heartbeat", { timestamp: new Date().toISOString() });
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+let lastSolPrice: number | null = null;
+
+async function fetchSolPrice(): Promise<number | null> {
+  try {
+    const resp = await fetch(`https://api.jup.ag/price/v2?ids=${SOL_MINT}`);
+    if (!resp.ok) return lastSolPrice;
+    const json = (await resp.json()) as { data?: Record<string, { price?: string }> };
+    const price = json?.data?.[SOL_MINT]?.price;
+    if (price) {
+      lastSolPrice = parseFloat(price);
+    }
+    return lastSolPrice;
+  } catch {
+    return lastSolPrice;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Periodic heartbeat (every 10 seconds) — includes SOL price
+// ---------------------------------------------------------------------------
+
+setInterval(async () => {
+  try {
+    const solPrice = await fetchSolPrice();
+    io.emit("heartbeat", {
+      timestamp: new Date().toISOString(),
+      solPrice,
+    });
+  } catch {
+    io.emit("heartbeat", {
+      timestamp: new Date().toISOString(),
+      solPrice: lastSolPrice,
+    });
+  }
 }, 10_000);
 
 // ---------------------------------------------------------------------------
@@ -52,9 +85,12 @@ setInterval(() => {
 // ---------------------------------------------------------------------------
 
 async function start(): Promise<void> {
-  // Attempt DB connection (non-fatal if it fails)
+  // Database is required — process.exit(1) if connection fails
   await connectDb();
-  await seedIfEmpty();
+
+  // Redis + queues are optional — they degrade gracefully
+  connectRedis();
+  initQueues();
 
   httpServer.listen(config.port, () => {
     logger.info(`FYRST API server running on port ${config.port}`);

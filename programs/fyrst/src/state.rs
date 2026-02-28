@@ -49,6 +49,8 @@ pub struct BondingCurve {
     pub graduated: bool,
     /// Deployer address
     pub deployer: Pubkey,
+    /// Total SOL ever collected (for pro-rata refund denominator, never decreases)
+    pub total_sol_collected: u64,
     /// Bump seed for PDA
     pub bump: u8,
 }
@@ -62,6 +64,29 @@ impl BondingCurve {
         + 8   // reserve_balance
         + 1   // graduated
         + 32  // deployer
+        + 8   // total_sol_collected
+        + 1;  // bump
+}
+
+/// Protocol configuration (singleton PDA)
+#[account]
+#[derive(Default)]
+pub struct ProtocolConfig {
+    /// Authority that can call mark_rugged
+    pub authority: Pubkey,
+    /// Treasury wallet for protocol fee collection
+    pub treasury: Pubkey,
+    /// Graduation threshold in lamports
+    pub graduation_threshold: u64,
+    /// Bump seed for PDA
+    pub bump: u8,
+}
+
+impl ProtocolConfig {
+    pub const LEN: usize = 8  // discriminator
+        + 32  // authority
+        + 32  // treasury
+        + 8   // graduation_threshold
         + 1;  // bump
 }
 

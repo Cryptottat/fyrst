@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { prisma, dbConnected } from "../lib/prisma";
-import { mockStore } from "../lib/mockStore";
 import { logger } from "../utils/logger";
 import { validateBody, validateQuery } from "../middleware/validate";
 import { createLaunchSchema, launchesQuerySchema } from "../schemas";
@@ -32,11 +31,8 @@ launchesRouter.get(
       const limit = parseInt(parsed.limit, 10) || 20;
       const offset = parseInt(parsed.offset, 10) || 0;
 
-      // Fallback mock data when DB is unavailable
       if (!dbConnected()) {
-        const result = mockStore.getTokens(sort, limit, offset);
-        res.json({ success: true, data: result });
-        return;
+        return res.status(503).json({ error: "Database unavailable" });
       }
 
       // Build order-by clause
@@ -116,13 +112,7 @@ launchesRouter.get(
       const mint = req.params.mint as string;
 
       if (!dbConnected()) {
-        const token = mockStore.getToken(mint);
-        if (token) {
-          res.json({ success: true, data: token });
-        } else {
-          res.status(404).json({ success: false, error: "Token not found" });
-        }
-        return;
+        return res.status(503).json({ error: "Database unavailable" });
       }
 
       const token = await prisma.token.findUnique({
@@ -211,23 +201,7 @@ launchesRouter.post(
       const mint = clientMint || `mint_${uuidv4().replace(/-/g, "").slice(0, 32)}`;
 
       if (!dbConnected()) {
-        const mockToken = mockStore.addToken({
-          mint, name, symbol, description, imageUrl, deployerAddress,
-          collateralAmount,
-        });
-
-        // Emit socket event
-        try {
-          const io = getIo();
-          if (io) {
-            io.emit("launch:new", mockToken);
-          }
-        } catch {
-          // Socket not initialized yet
-        }
-
-        res.status(201).json({ success: true, data: mockToken });
-        return;
+        return res.status(503).json({ error: "Database unavailable" });
       }
 
       // Upsert deployer

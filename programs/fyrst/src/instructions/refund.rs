@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::state::{BuyerRecord, EscrowVault};
+use crate::state::{BuyerRecord, EscrowVault, BondingCurve, ProtocolConfig};
 use crate::errors::FyrstError;
 use crate::constants::*;
 
@@ -17,11 +17,11 @@ pub fn record_buyer(ctx: Context<RecordBuyer>, amount: u64, price: u64) -> Resul
     }
 
     // Update totals
-    let sol_spent = amount
-        .checked_mul(price)
+    let sol_spent = (amount as u128)
+        .checked_mul(price as u128)
         .ok_or(FyrstError::MathOverflow)?
-        .checked_div(1_000_000_000)
-        .ok_or(FyrstError::MathOverflow)?;
+        .checked_div(10u128.pow(TOKEN_DECIMALS as u32))
+        .ok_or(FyrstError::MathOverflow)? as u64;
 
     record.total_bought = record
         .total_bought
@@ -35,12 +35,11 @@ pub fn record_buyer(ctx: Context<RecordBuyer>, amount: u64, price: u64) -> Resul
 
     // Recalculate average price
     if record.total_bought > 0 {
-        record.avg_price = record
-            .total_sol_spent
-            .checked_mul(1_000_000_000)
+        record.avg_price = (record.total_sol_spent as u128)
+            .checked_mul(10u128.pow(TOKEN_DECIMALS as u32))
             .ok_or(FyrstError::MathOverflow)?
-            .checked_div(record.total_bought)
-            .ok_or(FyrstError::MathOverflow)?;
+            .checked_div(record.total_bought as u128)
+            .ok_or(FyrstError::MathOverflow)? as u64;
     }
 
     msg!(
@@ -54,20 +53,27 @@ pub fn record_buyer(ctx: Context<RecordBuyer>, amount: u64, price: u64) -> Resul
     Ok(())
 }
 
-/// Process refund for a buyer from escrow (called by protocol authority)
+/// Process pro-rata refund for a buyer from escrow (called by protocol authority)
 pub fn process_refund(ctx: Context<ProcessRefund>) -> Result<()> {
     let escrow = &ctx.accounts.escrow_vault;
     let record = &mut ctx.accounts.buyer_record;
+    let curve = &ctx.accounts.bonding_curve;
 
     require!(!record.refund_claimed, FyrstError::RefundAlreadyProcessed);
     require!(escrow.rugged, FyrstError::SafePeriodExpired);
 
-    // Calculate pro-rata refund from escrow
-    // refund_amount = (buyer_sol_spent / total_curve_sol) * escrow_collateral
-    // Simplified: refund up to total_sol_spent, capped by escrow balance
-    let refund_amount = record
-        .total_sol_spent
-        .min(escrow.collateral_amount);
+    // Pro-rata refund: refund = (buyer_sol_spent * escrow_collateral) / total_sol_collected
+    // Use u128 intermediate to avoid overflow
+    let refund_amount = if curve.total_sol_collected > 0 {
+        (record.total_sol_spent as u128)
+            .checked_mul(escrow.collateral_amount as u128)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(curve.total_sol_collected as u128)
+            .ok_or(FyrstError::MathOverflow)? as u64
+    } else {
+        // No SOL ever collected — refund full amount up to collateral
+        record.total_sol_spent.min(escrow.collateral_amount)
+    };
 
     require!(refund_amount > 0, FyrstError::NoBuyerRecord);
 
@@ -110,6 +116,9 @@ pub struct RecordBuyer<'info> {
 #[derive(Accounts)]
 pub struct ProcessRefund<'info> {
     /// Protocol authority that triggers refunds
+    #[account(
+        constraint = authority.key() == protocol_config.authority @ FyrstError::Unauthorized
+    )]
     pub authority: Signer<'info>,
 
     /// CHECK: Buyer receiving the refund
@@ -117,11 +126,23 @@ pub struct ProcessRefund<'info> {
     pub buyer: UncheckedAccount<'info>,
 
     #[account(
+        seeds = [PROTOCOL_SEED],
+        bump = protocol_config.bump,
+    )]
+    pub protocol_config: Account<'info, ProtocolConfig>,
+
+    #[account(
         mut,
         seeds = [ESCROW_SEED, escrow_vault.deployer.as_ref(), escrow_vault.token_mint.as_ref()],
         bump = escrow_vault.bump,
     )]
     pub escrow_vault: Account<'info, EscrowVault>,
+
+    #[account(
+        seeds = [CURVE_SEED, escrow_vault.token_mint.as_ref()],
+        bump = bonding_curve.bump,
+    )]
+    pub bonding_curve: Account<'info, BondingCurve>,
 
     #[account(
         mut,

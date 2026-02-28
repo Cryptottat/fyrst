@@ -15,9 +15,9 @@ export const createLaunchSchema = z.object({
   name: z.string().min(1).max(64),
   symbol: z.string().min(1).max(16).transform((s) => s.toUpperCase()),
   description: z.string().max(500).default(""),
-  imageUrl: z.string().url().or(z.literal("")).default(""),
+  imageUrl: z.string().default(""),
   deployerAddress: solanaAddress,
-  collateralAmount: z.number().min(1, "Minimum collateral is 1 SOL"),
+  collateralAmount: z.number().min(0.01, "Minimum collateral is 0.01 SOL"),
   escrowTxSignature: z.string().min(32).optional(),
   curveTxSignature: z.string().min(32).optional(),
 });
