@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ApiTrade } from "@/lib/api";
 
 interface BondingCurveChartProps {
   trades: ApiTrade[];
   currentPrice: number;
+  totalSupply?: number;
 }
 
 interface Candle {
@@ -16,8 +17,16 @@ interface Candle {
   close: number;
 }
 
-/** Aggregate trades into 5-minute OHLCV candles */
-function aggregateCandles(trades: ApiTrade[], intervalMs = 5 * 60 * 1000): Candle[] {
+const INTERVALS = [
+  { label: "1s", ms: 1_000 },
+  { label: "1m", ms: 60_000 },
+  { label: "5m", ms: 5 * 60_000 },
+  { label: "15m", ms: 15 * 60_000 },
+  { label: "1h", ms: 60 * 60_000 },
+];
+
+/** Aggregate trades into OHLCV candles at the given interval */
+function aggregateCandles(trades: ApiTrade[], intervalMs: number): Candle[] {
   if (trades.length === 0) return [];
 
   const sorted = [...trades].sort(
@@ -25,7 +34,8 @@ function aggregateCandles(trades: ApiTrade[], intervalMs = 5 * 60 * 1000): Candl
   );
 
   const candles: Candle[] = [];
-  let bucketStart = Math.floor(new Date(sorted[0].createdAt).getTime() / intervalMs) * intervalMs;
+  let bucketStart =
+    Math.floor(new Date(sorted[0].createdAt).getTime() / intervalMs) * intervalMs;
   let open = sorted[0].price;
   let high = sorted[0].price;
   let low = sorted[0].price;
@@ -36,17 +46,12 @@ function aggregateCandles(trades: ApiTrade[], intervalMs = 5 * 60 * 1000): Candl
     const bucket = Math.floor(ts / intervalMs) * intervalMs;
 
     if (bucket !== bucketStart) {
-      candles.push({
-        time: Math.floor(bucketStart / 1000),
-        open,
-        high,
-        low,
-        close,
-      });
+      candles.push({ time: Math.floor(bucketStart / 1000), open, high, low, close });
       bucketStart = bucket;
-      open = t.price;
-      high = t.price;
-      low = t.price;
+      // New candle open = previous candle close
+      open = close;
+      high = Math.max(open, t.price);
+      low = Math.min(open, t.price);
       close = t.price;
     } else {
       high = Math.max(high, t.price);
@@ -55,141 +60,175 @@ function aggregateCandles(trades: ApiTrade[], intervalMs = 5 * 60 * 1000): Candl
     }
   }
 
-  // Push last candle
-  candles.push({
-    time: Math.floor(bucketStart / 1000),
-    open,
-    high,
-    low,
-    close,
-  });
-
+  candles.push({ time: Math.floor(bucketStart / 1000), open, high, low, close });
   return candles;
 }
 
 export default function BondingCurveChart({
   trades,
   currentPrice,
+  totalSupply,
 }: BondingCurveChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<ReturnType<typeof import("lightweight-charts").createChart> | null>(null);
+  const chartRef = useRef<ReturnType<
+    typeof import("lightweight-charts").createChart
+  > | null>(null);
   const seriesRef = useRef<unknown>(null);
   const priceLineRef = useRef<unknown>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-  // One-time chart creation
-  const initChart = useCallback(async () => {
-    if (!containerRef.current || chartRef.current) return;
+  const [chartReady, setChartReady] = useState(false);
+  const [intervalIdx, setIntervalIdx] = useState(0); // default 1s
+  const [viewMode, setViewMode] = useState<"price" | "mcap">("price");
 
-    const { createChart, CandlestickSeries, ColorType } = await import(
-      "lightweight-charts"
-    );
-
-    if (!containerRef.current) return;
-
-    const chart = createChart(containerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: "#0A0A0C" },
-        textColor: "#55555F",
-        fontFamily: "'VT323', 'JetBrains Mono', monospace",
-        fontSize: 12,
-      },
-      grid: {
-        vertLines: { color: "rgba(42, 42, 48, 0.5)" },
-        horzLines: { color: "rgba(42, 42, 48, 0.5)" },
-      },
-      crosshair: {
-        vertLine: { color: "rgba(167, 139, 250, 0.4)", labelBackgroundColor: "#A78BFA" },
-        horzLine: { color: "rgba(167, 139, 250, 0.4)", labelBackgroundColor: "#A78BFA" },
-      },
-      rightPriceScale: {
-        borderColor: "#2A2A30",
-      },
-      timeScale: {
-        borderColor: "#2A2A30",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      handleScroll: { vertTouchDrag: false },
-    });
-
-    chartRef.current = chart;
-
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#34D399",
-      downColor: "#F87171",
-      borderUpColor: "#34D399",
-      borderDownColor: "#F87171",
-      wickUpColor: "#34D399",
-      wickDownColor: "#F87171",
-    });
-
-    seriesRef.current = candleSeries;
-
-    const ro = new ResizeObserver(() => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
-      }
-    });
-    ro.observe(containerRef.current);
-    resizeObserverRef.current = ro;
-  }, []);
-
-  // Init chart once
+  // -----------------------------------------------------------------------
+  // Chart lifecycle — cancelled flag prevents double-creation in strict mode
+  // -----------------------------------------------------------------------
   useEffect(() => {
-    initChart();
+    let cancelled = false;
+    let localChart: typeof chartRef.current = null;
+    let ro: ResizeObserver | null = null;
+
+    (async () => {
+      if (!containerRef.current) return;
+
+      const { createChart, CandlestickSeries, ColorType } = await import(
+        "lightweight-charts"
+      );
+      if (cancelled || !containerRef.current) return;
+
+      localChart = createChart(containerRef.current, {
+        layout: {
+          background: { type: ColorType.Solid, color: "#0A0A0C" },
+          textColor: "#55555F",
+          fontFamily: "'VT323', 'JetBrains Mono', monospace",
+          fontSize: 12,
+        },
+        grid: {
+          vertLines: { color: "rgba(42, 42, 48, 0.5)" },
+          horzLines: { color: "rgba(42, 42, 48, 0.5)" },
+        },
+        crosshair: {
+          vertLine: {
+            color: "rgba(167, 139, 250, 0.4)",
+            labelBackgroundColor: "#A78BFA",
+          },
+          horzLine: {
+            color: "rgba(167, 139, 250, 0.4)",
+            labelBackgroundColor: "#A78BFA",
+          },
+        },
+        rightPriceScale: { borderColor: "#2A2A30" },
+        timeScale: {
+          borderColor: "#2A2A30",
+          timeVisible: true,
+          secondsVisible: true,
+        },
+        handleScroll: { vertTouchDrag: false },
+      });
+
+      chartRef.current = localChart;
+
+      const series = localChart.addSeries(CandlestickSeries, {
+        upColor: "#34D399",
+        downColor: "#F87171",
+        borderUpColor: "#34D399",
+        borderDownColor: "#F87171",
+        wickUpColor: "#34D399",
+        wickDownColor: "#F87171",
+        priceFormat: {
+          type: "price",
+          precision: 8,
+          minMove: 0.00000001,
+        },
+      });
+
+      seriesRef.current = series;
+
+      ro = new ResizeObserver(() => {
+        if (containerRef.current && localChart) {
+          localChart.applyOptions({ width: containerRef.current.clientWidth });
+        }
+      });
+      ro.observe(containerRef.current);
+
+      setChartReady(true);
+    })();
 
     return () => {
-      resizeObserverRef.current?.disconnect();
-      if (chartRef.current) {
-        chartRef.current.remove();
-        chartRef.current = null;
-      }
+      cancelled = true;
+      ro?.disconnect();
+      if (localChart) localChart.remove();
+      chartRef.current = null;
       seriesRef.current = null;
       priceLineRef.current = null;
+      setChartReady(false);
     };
-  }, [initChart]);
+  }, []);
 
-  // Update candle data when trades change
+  // -----------------------------------------------------------------------
+  // Update candle data
+  // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!seriesRef.current || trades.length === 0) return;
+    if (!chartReady || !seriesRef.current) return;
 
-    const series = seriesRef.current as import("lightweight-charts").ISeriesApi<"Candlestick">;
-    const candles = aggregateCandles(trades);
+    const series =
+      seriesRef.current as import("lightweight-charts").ISeriesApi<"Candlestick">;
+    const interval = INTERVALS[intervalIdx].ms;
+    const multiplier =
+      viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
 
-    series.setData(
-      candles.map((c) => ({
-        time: c.time as import("lightweight-charts").UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      })),
-    );
+    if (trades.length === 0) {
+      // No trades yet — show single candle at current base price
+      if (currentPrice > 0) {
+        const val = currentPrice * multiplier;
+        const now = Math.floor(
+          Date.now() / 1000,
+        ) as import("lightweight-charts").UTCTimestamp;
+        series.setData([
+          { time: now, open: val, high: val, low: val, close: val },
+        ]);
+      }
+    } else {
+      const candles = aggregateCandles(trades, interval);
+      series.setData(
+        candles.map((c) => ({
+          time: c.time as import("lightweight-charts").UTCTimestamp,
+          open: c.open * multiplier,
+          high: c.high * multiplier,
+          low: c.low * multiplier,
+          close: c.close * multiplier,
+        })),
+      );
+    }
 
     chartRef.current?.timeScale().fitContent();
-  }, [trades]);
+  }, [trades, currentPrice, intervalIdx, viewMode, totalSupply, chartReady]);
 
-  // Update price line when currentPrice changes
+  // -----------------------------------------------------------------------
+  // Price line
+  // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!seriesRef.current) return;
+    if (!chartReady || !seriesRef.current) return;
 
-    const series = seriesRef.current as import("lightweight-charts").ISeriesApi<"Candlestick">;
+    const series =
+      seriesRef.current as import("lightweight-charts").ISeriesApi<"Candlestick">;
 
-    // Remove old price line
     if (priceLineRef.current) {
       try {
         series.removePriceLine(
           priceLineRef.current as import("lightweight-charts").IPriceLine,
         );
       } catch {
-        // line already removed
+        /* already removed */
       }
     }
 
+    const multiplier =
+      viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
+
     import("lightweight-charts").then(({ LineStyle }) => {
       const line = series.createPriceLine({
-        price: currentPrice,
+        price: currentPrice * multiplier,
         color: "#FB923C",
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
@@ -198,26 +237,52 @@ export default function BondingCurveChart({
       });
       priceLineRef.current = line;
     });
-  }, [currentPrice]);
+  }, [currentPrice, viewMode, totalSupply, chartReady]);
 
-  if (trades.length === 0) {
-    return (
-      <div
-        className="w-full arcade-border flex items-center justify-center"
-        style={{ height: 280 }}
-      >
-        <p className="text-[10px] font-display text-text-muted tracking-wider">
-          NO TRADES YET
-        </p>
-      </div>
-    );
-  }
+  // -----------------------------------------------------------------------
+  // UI
+  // -----------------------------------------------------------------------
+  const btnClass = (active: boolean) =>
+    `text-[8px] px-2 py-1 font-display border transition-colors cursor-pointer ${
+      active
+        ? "text-primary border-primary bg-primary/10"
+        : "text-text-muted border-border hover:border-border-hover"
+    }`;
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full arcade-border"
-      style={{ height: 280 }}
-    />
+    <div>
+      <div className="flex items-center gap-3 mb-2 flex-wrap">
+        <div className="flex gap-1">
+          {INTERVALS.map((iv, i) => (
+            <button
+              key={iv.label}
+              onClick={() => setIntervalIdx(i)}
+              className={btnClass(i === intervalIdx)}
+            >
+              {iv.label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex gap-1">
+          <button
+            onClick={() => setViewMode("price")}
+            className={btnClass(viewMode === "price")}
+          >
+            PRICE
+          </button>
+          <button
+            onClick={() => setViewMode("mcap")}
+            className={btnClass(viewMode === "mcap")}
+          >
+            MCAP
+          </button>
+        </div>
+      </div>
+      <div
+        ref={containerRef}
+        className="w-full arcade-border"
+        style={{ height: 340 }}
+      />
+    </div>
   );
 }

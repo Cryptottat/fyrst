@@ -1,15 +1,21 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use crate::state::EscrowVault;
+use crate::state::{EscrowVault, BondingCurve};
 use crate::errors::FyrstError;
 use crate::constants::*;
 
-/// Create an escrow vault with deployer collateral
-pub fn create_escrow(ctx: Context<CreateEscrow>, collateral_amount: u64) -> Result<()> {
+/// Create an escrow vault with deployer collateral and custom deadline
+pub fn create_escrow(ctx: Context<CreateEscrow>, collateral_amount: u64, duration_seconds: i64) -> Result<()> {
     require!(
         collateral_amount >= MIN_COLLATERAL,
         FyrstError::InsufficientCollateral
     );
+    require!(
+        duration_seconds >= MIN_DURATION && duration_seconds <= MAX_DURATION,
+        FyrstError::InvalidDuration
+    );
+
+    let now = Clock::get()?.unix_timestamp;
 
     // Transfer SOL from deployer to escrow PDA (before mutable borrow)
     system_program::transfer(
@@ -27,55 +33,38 @@ pub fn create_escrow(ctx: Context<CreateEscrow>, collateral_amount: u64) -> Resu
     escrow.deployer = ctx.accounts.deployer.key();
     escrow.token_mint = ctx.accounts.token_mint.key();
     escrow.collateral_amount = collateral_amount;
-    escrow.created_at = Clock::get()?.unix_timestamp;
+    escrow.created_at = now;
+    escrow.deadline_timestamp = now + duration_seconds;
     escrow.released = false;
-    escrow.rugged = false;
     escrow.bump = ctx.bumps.escrow_vault;
 
     msg!(
-        "Escrow created: deployer={}, mint={}, collateral={}",
+        "Escrow created: deployer={}, mint={}, collateral={}, deadline={}",
         escrow.deployer,
         escrow.token_mint,
-        collateral_amount
+        collateral_amount,
+        escrow.deadline_timestamp
     );
 
     Ok(())
 }
 
-/// Release escrow back to deployer after safe period
+/// Release escrow back to deployer (requires token graduation)
+/// Anchor `close = deployer` closes the PDA, returning collateral + rent to deployer.
 pub fn release_escrow(ctx: Context<ReleaseEscrow>) -> Result<()> {
-    let amount;
-    let deployer_key;
-    {
-        let escrow = &mut ctx.accounts.escrow_vault;
+    let escrow = &ctx.accounts.escrow_vault;
+    let curve = &ctx.accounts.bonding_curve;
 
-        require!(!escrow.released, FyrstError::EscrowAlreadyReleased);
-        require!(!escrow.rugged, FyrstError::TokenIsRugged);
-        require!(
-            ctx.accounts.deployer.key() == escrow.deployer,
-            FyrstError::Unauthorized
-        );
-
-        let now = Clock::get()?.unix_timestamp;
-        require!(
-            now >= escrow.created_at + SAFE_PERIOD,
-            FyrstError::SafePeriodActive
-        );
-
-        escrow.released = true;
-        amount = escrow.collateral_amount;
-        deployer_key = escrow.deployer;
-    }
-
-    // Transfer SOL back to deployer from escrow PDA (after mutable borrow is dropped)
-    **ctx.accounts.escrow_vault.to_account_info().try_borrow_mut_lamports()? -= amount;
-    **ctx.accounts.deployer.to_account_info().try_borrow_mut_lamports()? += amount;
+    require!(!escrow.released, FyrstError::EscrowAlreadyReleased);
+    require!(curve.graduated, FyrstError::NotGraduated);
 
     msg!(
         "Escrow released: deployer={}, amount={}",
-        deployer_key,
-        amount
+        escrow.deployer,
+        escrow.collateral_amount
     );
+
+    // Anchor `close = deployer` handles all lamport transfer + account cleanup
 
     Ok(())
 }
@@ -110,8 +99,15 @@ pub struct ReleaseEscrow<'info> {
         seeds = [ESCROW_SEED, deployer.key().as_ref(), escrow_vault.token_mint.as_ref()],
         bump = escrow_vault.bump,
         has_one = deployer,
+        close = deployer,
     )]
     pub escrow_vault: Account<'info, EscrowVault>,
+
+    #[account(
+        seeds = [CURVE_SEED, escrow_vault.token_mint.as_ref()],
+        bump = bonding_curve.bump,
+    )]
+    pub bonding_curve: Account<'info, BondingCurve>,
 
     pub system_program: Program<'info, System>,
 }

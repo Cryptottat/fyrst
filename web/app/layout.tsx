@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Press_Start_2P, DM_Sans, JetBrains_Mono, VT323 } from "next/font/google";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import ConnectionBanner from "@/components/common/ConnectionBanner";
+import { TopMarquee, BottomMarquee } from "@/components/common/Marquee";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
 import WalletProvider from "@/components/providers/WalletProvider";
 import SocketProvider from "@/components/providers/SocketProvider";
 import "./globals.css";
@@ -62,18 +65,26 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // 서버 컴포넌트에서 읽으므로 NEXT_PUBLIC_ 없이도 동작 — 키가 번들에 노출되지 않음
+  const rpcEndpoint = process.env.SOLANA_RPC || process.env.NEXT_PUBLIC_SOLANA_RPC;
+
   return (
     <html lang="en">
       <body
         className={`${pressStart2P.variable} ${dmSans.variable} ${jetbrainsMono.variable} ${vt323.variable} font-sans antialiased bg-bg text-text-primary`}
       >
-        <WalletProvider>
+        <WalletProvider rpcEndpoint={rpcEndpoint}>
           <SocketProvider>
             {/* CRT scanline + vignette overlay */}
             <div className="crt-overlay" />
+            <TopMarquee />
             <Header />
-            <div className="min-h-screen">{children}</div>
+            <ErrorBoundary>
+              <div className="min-h-screen pb-8">{children}</div>
+            </ErrorBoundary>
             <Footer />
+            <BottomMarquee />
+            <ConnectionBanner />
           </SocketProvider>
         </WalletProvider>
       </body>

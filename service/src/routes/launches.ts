@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { prisma, dbConnected } from "../lib/prisma";
 import { logger } from "../utils/logger";
 import { validateBody, validateQuery } from "../middleware/validate";
+import { launchLimiter } from "../middleware/rateLimiter";
 import { createLaunchSchema, launchesQuerySchema } from "../schemas";
 import { assignTier, validateCollateral } from "../services/escrow";
 import { computeScore, scoreToRank } from "../services/reputation";
@@ -40,6 +41,8 @@ launchesRouter.get(
       let orderBy: OrderBy = { createdAt: "desc" };
       if (sort === "marketcap") {
         orderBy = { marketCap: "desc" };
+      } else if (sort === "lastTrade") {
+        orderBy = { lastTradeAt: "desc" };
       }
 
       // When sorting by reputation we sort after fetching (requires join)
@@ -74,7 +77,9 @@ launchesRouter.get(
         marketCap: t.marketCap,
         currentPrice: t.currentPrice,
         totalSupply: t.totalSupply,
+        collateralAmount: t.collateralAmount,
         collateralTier: t.collateralTier,
+        deadlineTimestamp: t.deadlineTimestamp?.toISOString() ?? null,
         graduated: t.graduated,
         bondingCurveProgress: t.bondingCurveProgress,
         createdAt: t.createdAt.toISOString(),
@@ -141,7 +146,9 @@ launchesRouter.get(
           marketCap: token.marketCap,
           currentPrice: token.currentPrice,
           totalSupply: token.totalSupply,
+          collateralAmount: token.collateralAmount,
           collateralTier: token.collateralTier,
+          deadlineTimestamp: token.deadlineTimestamp?.toISOString() ?? null,
           graduated: token.graduated,
           bondingCurveProgress: token.bondingCurveProgress,
           createdAt: token.createdAt.toISOString(),
@@ -171,6 +178,7 @@ launchesRouter.get(
 
 launchesRouter.post(
   "/",
+  launchLimiter,
   validateBody(createLaunchSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -182,6 +190,7 @@ launchesRouter.post(
         imageUrl,
         deployerAddress,
         collateralAmount,
+        durationSeconds,
         escrowTxSignature,
         curveTxSignature,
       } = req.body;
@@ -237,6 +246,12 @@ launchesRouter.post(
         data: { reputationScore: score, reputationRank: rank },
       });
 
+      // Compute deadline from durationSeconds (default 24h)
+      const durationSec = typeof durationSeconds === "number" && durationSeconds >= 3600 && durationSeconds <= 604800
+        ? durationSeconds
+        : 86400;
+      const deadlineTimestamp = new Date(Date.now() + durationSec * 1000);
+
       // Create token
       const token = await prisma.token.create({
         data: {
@@ -247,7 +262,9 @@ launchesRouter.post(
           imageUrl: imageUrl || "",
           deployerAddress,
           currentPrice: spotPrice(0),
+          collateralAmount,
           collateralTier: tier,
+          deadlineTimestamp,
         },
       });
 
@@ -261,7 +278,9 @@ launchesRouter.post(
         marketCap: token.marketCap,
         currentPrice: token.currentPrice,
         totalSupply: token.totalSupply,
+        collateralAmount: token.collateralAmount,
         collateralTier: token.collateralTier,
+        deadlineTimestamp: token.deadlineTimestamp?.toISOString() ?? null,
         graduated: token.graduated,
         bondingCurveProgress: token.bondingCurveProgress,
         createdAt: token.createdAt.toISOString(),

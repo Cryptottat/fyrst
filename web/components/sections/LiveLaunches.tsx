@@ -48,18 +48,26 @@ function TokenCard({ token, index }: TokenCardProps) {
           </span>
         </div>
 
-        <div className="flex items-start justify-between mb-3 mt-1">
-          <div>
-            <h3 className="text-[10px] font-display text-text-primary leading-relaxed">
+        <div className="flex items-start gap-3 mb-3 mt-1">
+          {token.imageUrl && (
+            <img
+              src={token.imageUrl}
+              alt={token.name}
+              className="w-12 h-12 object-cover arcade-border flex-shrink-0"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[10px] font-display text-text-primary leading-relaxed truncate">
               {token.name}
             </h3>
-            <p className="text-xs font-mono text-text-muted mt-1">
+            <p className="text-xs font-mono text-text-muted mt-0.5">
               ${token.symbol}
             </p>
-          </div>
-          <div className="flex gap-1.5 mt-0.5">
-            <Badge label={grade} variant="reputation" />
-            <Badge label={tier} variant="collateral" />
+            <div className="flex gap-1.5 mt-1.5">
+              <Badge label={grade} variant="reputation" />
+              <Badge label={tier} variant="collateral" />
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
+import { PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, ComputeBudgetProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
@@ -19,7 +19,6 @@ export const PROGRAM_ID = new PublicKey(
 
 const ESCROW_SEED = Buffer.from("escrow");
 const CURVE_SEED = Buffer.from("curve");
-const BUYER_SEED = Buffer.from("record");
 const PROTOCOL_SEED = Buffer.from("protocol");
 
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
@@ -50,16 +49,6 @@ export function getEscrowPDA(
 export function getCurvePDA(tokenMint: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [CURVE_SEED, tokenMint.toBuffer()],
-    PROGRAM_ID,
-  );
-}
-
-export function getBuyerRecordPDA(
-  buyer: PublicKey,
-  tokenMint: PublicKey,
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [BUYER_SEED, buyer.toBuffer(), tokenMint.toBuffer()],
     PROGRAM_ID,
   );
 }
@@ -122,11 +111,10 @@ export function useAnchorProgram() {
 
 export interface LaunchResult {
   tokenMintKeypair: Keypair;
-  escrowTxSig: string;
-  curveTxSig: string;
+  txSig: string;
 }
 
-/** Launch a new token: create_escrow + init_bonding_curve (with SPL mint + metadata) */
+/** Launch a new token: create_escrow + init_bonding_curve batched in 1 TX (1 wallet approval) */
 export async function launchToken(
   program: FyrstProgram,
   deployer: PublicKey,
@@ -134,9 +122,11 @@ export async function launchToken(
   name: string,
   symbol: string,
   uri: string,
+  durationSeconds: BN = new BN(86_400),
   basePrice: BN = DEFAULT_BASE_PRICE,
   slope: BN = DEFAULT_SLOPE,
 ): Promise<LaunchResult> {
+  const provider = program.provider as AnchorProvider;
   const tokenMintKeypair = Keypair.generate();
   const tokenMint = tokenMintKeypair.publicKey;
 
@@ -146,19 +136,17 @@ export async function launchToken(
 
   const methods = program.methods as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  // Step 1: Create escrow with collateral
-  const escrowTxSig: string = await methods
-    .createEscrow(collateralLamports)
+  const escrowIx = await methods
+    .createEscrow(collateralLamports, durationSeconds)
     .accounts({
       deployer,
       tokenMint,
       escrowVault,
       systemProgram: SystemProgram.programId,
     })
-    .rpc();
+    .instruction();
 
-  // Step 2: Initialize bonding curve + SPL mint + metadata
-  const curveTxSig: string = await methods
+  const curveIx = await methods
     .initBondingCurve(basePrice, slope, name, symbol, uri)
     .accounts({
       deployer,
@@ -170,48 +158,189 @@ export async function launchToken(
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
-    .signers([tokenMintKeypair])
-    .rpc();
+    .instruction();
 
-  return { tokenMintKeypair, escrowTxSig, curveTxSig };
+  // Single TX: escrow + bonding curve (1 wallet signature)
+  const tx = new Transaction().add(escrowIx, curveIx);
+  const txSig = await provider.sendAndConfirm(tx, [tokenMintKeypair]);
+
+  return { tokenMintKeypair, txSig };
 }
 
-/** Buy tokens on a bonding curve — mints real SPL tokens to buyer ATA */
-export async function buyTokens(
+/** Launch + initial buy: escrow + curve + buy in 1 TX (1 wallet approval) */
+export async function launchAndBuy(
   program: FyrstProgram,
-  buyer: PublicKey,
-  tokenMint: PublicKey,
-  solAmountLamports: BN,
-): Promise<{ txSig: string; recordTxSig: string }> {
+  deployer: PublicKey,
+  collateralLamports: BN,
+  name: string,
+  symbol: string,
+  uri: string,
+  buyAmountLamports: BN,
+  durationSeconds: BN = new BN(86_400),
+  slippageBps: number = DEFAULT_SLIPPAGE_BPS,
+  basePrice: BN = DEFAULT_BASE_PRICE,
+  slope: BN = DEFAULT_SLOPE,
+): Promise<LaunchResult> {
+  const provider = program.provider as AnchorProvider;
+  const tokenMintKeypair = Keypair.generate();
+  const tokenMint = tokenMintKeypair.publicKey;
+
+  const [escrowVault] = getEscrowPDA(deployer, tokenMint);
   const [bondingCurve] = getCurvePDA(tokenMint);
+  const metadataAccount = getMetadataPDA(tokenMint);
   const [protocolConfig] = getProtocolConfigPDA();
-  const [buyerRecord] = getBuyerRecordPDA(buyer, tokenMint);
+  const buyerTokenAccount = getAssociatedTokenAddressSync(tokenMint, deployer);
 
   // Fetch protocol config for treasury address
   const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
   const treasury = configAccount.treasury as PublicKey;
 
-  // Fetch current price for record_buyer
+  const methods = program.methods as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+  // IX 1: Create escrow
+  const escrowIx = await methods
+    .createEscrow(collateralLamports, durationSeconds)
+    .accounts({
+      deployer,
+      tokenMint,
+      escrowVault,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+
+  // IX 2: Init bonding curve
+  const curveIx = await methods
+    .initBondingCurve(basePrice, slope, name, symbol, uri)
+    .accounts({
+      deployer,
+      tokenMint,
+      bondingCurve,
+      metadataAccount,
+      metadataProgram: TOKEN_METADATA_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY,
+    })
+    .instruction();
+
+  // Calculate expected tokens using known initial state (supply = 0)
+  // Total fee = 1% trade fee only (no separate protocol fee)
+  const tradeFee = buyAmountLamports.mul(new BN(100)).div(new BN(10_000));
+  const netSol = buyAmountLamports.sub(tradeFee);
+  const expectedTokens = estimateBuyTokens(basePrice, slope, new BN(0), netSol);
+  const minTokensOut = expectedTokens.muln(10_000 - slippageBps).divn(10_000);
+
+  // IX 3: Buy tokens
+  const buyIx = await methods
+    .buyTokens(buyAmountLamports, minTokensOut)
+    .accounts({
+      buyer: deployer,
+      bondingCurve,
+      tokenMint,
+      buyerTokenAccount,
+      protocolConfig,
+      treasury,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+
+  // Single TX: escrow + curve + buy (1 wallet signature)
+  const tx = new Transaction()
+    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }))
+    .add(escrowIx, curveIx, buyIx);
+  const txSig = await provider.sendAndConfirm(tx, [tokenMintKeypair]);
+
+  return { tokenMintKeypair, txSig };
+}
+
+/** Integer square root (Babylonian method) for BN */
+function bnSqrt(n: BN): BN {
+  if (n.isZero()) return new BN(0);
+  let x = n;
+  let y = x.addn(1).divn(2);
+  while (y.lt(x)) {
+    x = y;
+    y = x.add(n.div(x)).divn(2);
+  }
+  return x;
+}
+
+/** Estimate tokens received for a buy using integral pricing */
+export function estimateBuyTokens(
+  basePrice: BN,
+  slope: BN,
+  currentSupply: BN,
+  netSolLamports: BN,
+): BN {
+  const d = new BN(10 ** TOKEN_DECIMALS);
+  if (slope.isZero()) {
+    return netSolLamports.mul(d).div(basePrice);
+  }
+  // Quadratic: slope*T^2 + 2*(base*D + slope*S)*T - 2*net*D^2 = 0
+  // T = (-b + sqrt(b^2 + 4ac)) / (2a)
+  const s = currentSupply;
+  const bp = basePrice;
+  const sl = slope;
+  const b = bp.mul(d).add(sl.mul(s)).muln(2);
+  const cVal = netSolLamports.mul(d).mul(d).muln(2);
+  const disc = b.mul(b).add(sl.muln(4).mul(cVal));
+  const sqrtDisc = bnSqrt(disc);
+  return sqrtDisc.sub(b).div(sl.muln(2));
+}
+
+/** Estimate SOL received for a sell using integral pricing */
+export function estimateSellSol(
+  basePrice: BN,
+  slope: BN,
+  currentSupply: BN,
+  tokenAmount: BN,
+): BN {
+  const d = new BN(10 ** TOKEN_DECIMALS);
+  // gross = base*T/D + slope*T*(2S-T) / (2*D^2)
+  const t = tokenAmount;
+  const s = currentSupply;
+  const part1 = basePrice.mul(t).div(d);
+  const part2 = slope.mul(t).mul(s.muln(2).sub(t)).div(d.mul(d).muln(2));
+  return part1.add(part2);
+}
+
+/** Default slippage tolerance in basis points (1% = 100 bps) */
+export const DEFAULT_SLIPPAGE_BPS = 100;
+
+/** Buy tokens on a bonding curve (1 TX, 1 wallet approval) */
+export async function buyTokens(
+  program: FyrstProgram,
+  buyer: PublicKey,
+  tokenMint: PublicKey,
+  solAmountLamports: BN,
+  slippageBps: number = DEFAULT_SLIPPAGE_BPS,
+): Promise<string> {
+  const provider = program.provider as AnchorProvider;
+  const [bondingCurve] = getCurvePDA(tokenMint);
+  const [protocolConfig] = getProtocolConfigPDA();
+
+  // Fetch protocol config for treasury address
+  const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const treasury = configAccount.treasury as PublicKey;
+
+  // Fetch current curve state
   const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve); // eslint-disable-line @typescript-eslint/no-explicit-any
   const ca = curveAccount as BondingCurveData;
-  // Normalize supply to whole-token units (matching on-chain logic)
-  const supplyUnits = ca.currentSupply.div(new BN(10 ** TOKEN_DECIMALS));
-  const currentPrice = ca.basePrice.add(ca.slope.mul(supplyUnits));
 
-  // Calculate tokens received (accounting for both fees)
+  // Calculate fees and net SOL (1% total fee)
   const tradeFee = solAmountLamports.mul(new BN(100)).div(new BN(10_000));
-  const protocolFee = solAmountLamports.mul(new BN(50)).div(new BN(10_000));
-  const netSol = solAmountLamports.sub(tradeFee).sub(protocolFee);
-  const tokensReceived = netSol
-    .mul(new BN(10 ** TOKEN_DECIMALS))
-    .div(currentPrice);
+  const netSol = solAmountLamports.sub(tradeFee);
+
+  // Estimate tokens using integral pricing
+  const expectedTokens = estimateBuyTokens(ca.basePrice, ca.slope, ca.currentSupply, netSol);
+  const minTokensOut = expectedTokens.muln(10_000 - slippageBps).divn(10_000);
 
   const buyerTokenAccount = getAssociatedTokenAddressSync(tokenMint, buyer);
 
-  const methods = program.methods as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-  const txSig: string = await methods
-    .buyTokens(solAmountLamports)
+  const buyIx = await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .buyTokens(solAmountLamports, minTokensOut)
     .accounts({
       buyer,
       bondingCurve,
@@ -223,19 +352,12 @@ export async function buyTokens(
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
-    .rpc();
+    .instruction();
 
-  const recordTxSig: string = await methods
-    .recordBuyer(tokensReceived, currentPrice)
-    .accounts({
-      buyer,
-      tokenMint,
-      buyerRecord,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-
-  return { txSig, recordTxSig };
+  const tx = new Transaction()
+    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+    .add(buyIx);
+  return await provider.sendAndConfirm(tx, []);
 }
 
 /** Sell tokens on a bonding curve — burns SPL tokens */
@@ -244,65 +366,111 @@ export async function sellTokens(
   seller: PublicKey,
   tokenMint: PublicKey,
   tokenAmount: BN,
+  slippageBps: number = DEFAULT_SLIPPAGE_BPS,
 ): Promise<string> {
+  const provider = program.provider as AnchorProvider;
   const [bondingCurve] = getCurvePDA(tokenMint);
+  const [protocolConfig] = getProtocolConfigPDA();
   const sellerTokenAccount = getAssociatedTokenAddressSync(tokenMint, seller);
 
-  return await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
-    .sellTokens(tokenAmount)
+  // Fetch protocol config for treasury address
+  const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const treasury = configAccount.treasury as PublicKey;
+
+  // Fetch curve state for expected SOL calculation
+  const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const ca = curveAccount as BondingCurveData;
+
+  // Estimate SOL received using integral pricing (1% total fee)
+  const expectedGross = estimateSellSol(ca.basePrice, ca.slope, ca.currentSupply, tokenAmount);
+  const tradeFee = expectedGross.muln(100).divn(10_000); // 1%
+  let expectedNet = expectedGross.sub(tradeFee);
+
+  // Cap at reserve balance (matches on-chain cap — prevents SlippageExceeded)
+  if (expectedNet.gt(ca.reserveBalance)) {
+    expectedNet = ca.reserveBalance;
+  }
+
+  const minSolOut = expectedNet.muln(10_000 - slippageBps).divn(10_000);
+
+  const sellIx = await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .sellTokens(tokenAmount, minSolOut)
     .accounts({
       seller,
       bondingCurve,
       tokenMint,
       sellerTokenAccount,
+      protocolConfig,
+      treasury,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+
+  // Add compute budget for safety with large amounts
+  const tx = new Transaction()
+    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }))
+    .add(sellIx);
+  return await provider.sendAndConfirm(tx, []);
+}
+
+/** Process burn-to-refund: burns buyer's tokens and returns pro-rata SOL from escrow */
+export async function processRefund(
+  program: FyrstProgram,
+  buyer: PublicKey,
+  deployer: PublicKey,
+  tokenMint: PublicKey,
+): Promise<string> {
+  const [escrowVault] = getEscrowPDA(deployer, tokenMint);
+  const [bondingCurve] = getCurvePDA(tokenMint);
+  const buyerTokenAccount = getAssociatedTokenAddressSync(tokenMint, buyer);
+
+  return await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .processRefund()
+    .accounts({
+      buyer,
+      escrowVault,
+      bondingCurve,
+      tokenMint,
+      buyerTokenAccount,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
     .rpc();
 }
 
-/** Mark a token as rugged (protocol authority only) */
-export async function markRugged(
+/** Claim accumulated trade fees (deployer only — 50% of trade fees) */
+export async function claimFees(
   program: FyrstProgram,
-  authority: PublicKey,
   deployer: PublicKey,
   tokenMint: PublicKey,
 ): Promise<string> {
-  const [protocolConfig] = getProtocolConfigPDA();
-  const [escrowVault] = getEscrowPDA(deployer, tokenMint);
+  const [bondingCurve] = getCurvePDA(tokenMint);
 
   return await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
-    .markRugged()
+    .claimFees()
     .accounts({
-      authority,
-      protocolConfig,
-      escrowVault,
+      deployer,
+      bondingCurve,
     })
     .rpc();
 }
 
-/** Process refund for a buyer (protocol authority only) */
-export async function processRefund(
+/** Release escrow back to deployer (requires token graduation) */
+export async function releaseEscrow(
   program: FyrstProgram,
-  authority: PublicKey,
-  buyer: PublicKey,
   deployer: PublicKey,
   tokenMint: PublicKey,
 ): Promise<string> {
-  const [protocolConfig] = getProtocolConfigPDA();
   const [escrowVault] = getEscrowPDA(deployer, tokenMint);
   const [bondingCurve] = getCurvePDA(tokenMint);
-  const [buyerRecord] = getBuyerRecordPDA(buyer, tokenMint);
 
   return await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
-    .processRefund()
+    .releaseEscrow()
     .accounts({
-      authority,
-      buyer,
-      protocolConfig,
+      deployer,
       escrowVault,
       bondingCurve,
-      buyerRecord,
       systemProgram: SystemProgram.programId,
     })
     .rpc();
@@ -339,16 +507,9 @@ export interface BondingCurveData {
   graduated: boolean;
   deployer: PublicKey;
   totalSolCollected: BN;
-}
-
-export interface BuyerRecordData {
-  buyer: PublicKey;
-  tokenMint: PublicKey;
-  totalBought: BN;
-  totalSolSpent: BN;
-  avgPrice: BN;
-  refundClaimed: boolean;
-  firstBuyAt: BN;
+  maxReserveReached: BN;
+  totalDeployerFees: BN;
+  claimedDeployerFees: BN;
 }
 
 export interface ProtocolConfigData {
@@ -365,20 +526,6 @@ export async function fetchBondingCurve(
     const [pda] = getCurvePDA(tokenMint);
     const account = await (program.account as any).bondingCurve.fetch(pda); // eslint-disable-line @typescript-eslint/no-explicit-any
     return account as unknown as BondingCurveData;
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchBuyerRecord(
-  program: FyrstProgram,
-  buyer: PublicKey,
-  tokenMint: PublicKey,
-): Promise<BuyerRecordData | null> {
-  try {
-    const [pda] = getBuyerRecordPDA(buyer, tokenMint);
-    const account = await (program.account as any).buyerRecord.fetch(pda); // eslint-disable-line @typescript-eslint/no-explicit-any
-    return account as unknown as BuyerRecordData;
   } catch {
     return null;
   }

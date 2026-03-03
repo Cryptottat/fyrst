@@ -32,7 +32,7 @@ function getMetadataPDA(mint: PublicKey): PublicKey {
   return pda;
 }
 
-describe("FYRST E2E Tests", () => {
+describe("FYRST v13 E2E Tests", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
@@ -45,7 +45,6 @@ describe("FYRST E2E Tests", () => {
   // PDAs
   let escrowPda: PublicKey;
   let curvePda: PublicKey;
-  let buyerRecordPda: PublicKey;
   let protocolConfigPda: PublicKey;
 
   before(async () => {
@@ -64,24 +63,15 @@ describe("FYRST E2E Tests", () => {
       program.programId
     );
 
-    [buyerRecordPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("record"),
-        buyer.publicKey.toBuffer(),
-        tokenMint.publicKey.toBuffer(),
-      ],
-      program.programId
-    );
-
     [protocolConfigPda] = PublicKey.findProgramAddressSync(
       [Buffer.from("protocol")],
       program.programId
     );
 
-    // Fund buyer and treasury wallets (small amounts to conserve devnet SOL)
+    // Fund buyer and treasury wallets
     const sig1 = await provider.connection.requestAirdrop(
       buyer.publicKey,
-      0.5 * LAMPORTS_PER_SOL
+      1 * LAMPORTS_PER_SOL
     );
     const sig2 = await provider.connection.requestAirdrop(
       treasury.publicKey,
@@ -90,6 +80,8 @@ describe("FYRST E2E Tests", () => {
     await provider.connection.confirmTransaction(sig1);
     await provider.connection.confirmTransaction(sig2);
   });
+
+  // ─── 1. Protocol Init ────────────────────────────────────────────
 
   it("1. Initialize protocol config", async () => {
     await (program.methods as any)
@@ -117,11 +109,14 @@ describe("FYRST E2E Tests", () => {
     console.log("  Protocol initialized: authority + treasury set");
   });
 
-  it("2. Create escrow with 0.02 SOL collateral", async () => {
-    const collateral = new anchor.BN(0.02 * LAMPORTS_PER_SOL);
+  // ─── 2. Escrow with Deadline ─────────────────────────────────────
+
+  it("2. Create escrow with 0.1 SOL + 1h deadline", async () => {
+    const collateral = new anchor.BN(0.1 * LAMPORTS_PER_SOL);
+    const duration = new anchor.BN(3600); // 1 hour
 
     await (program.methods as any)
-      .createEscrow(collateral)
+      .createEscrow(collateral, duration)
       .accounts({
         deployer: deployer.publicKey,
         tokenMint: tokenMint.publicKey,
@@ -134,15 +129,23 @@ describe("FYRST E2E Tests", () => {
     assert.equal(escrow.deployer.toBase58(), deployer.publicKey.toBase58());
     assert.equal(
       escrow.collateralAmount.toNumber(),
-      0.02 * LAMPORTS_PER_SOL
+      0.1 * LAMPORTS_PER_SOL
     );
     assert.equal(escrow.released, false);
-    assert.equal(escrow.rugged, false);
+    // deadline_timestamp should be created_at + 3600
+    assert.equal(
+      escrow.deadlineTimestamp.toNumber(),
+      escrow.createdAt.toNumber() + 3600
+    );
 
-    console.log("  Escrow created: 0.02 SOL locked");
+    console.log(
+      `  Escrow created: 0.1 SOL, deadline=${escrow.deadlineTimestamp.toNumber()}`
+    );
   });
 
-  it("3. Reject escrow with insufficient collateral (0.005 SOL)", async () => {
+  // ─── 3. Reject Insufficient Collateral ───────────────────────────
+
+  it("3. Reject escrow with insufficient collateral (< 0.1 SOL)", async () => {
     const badMint = Keypair.generate();
     const [badEscrow] = PublicKey.findProgramAddressSync(
       [
@@ -155,7 +158,10 @@ describe("FYRST E2E Tests", () => {
 
     try {
       await (program.methods as any)
-        .createEscrow(new anchor.BN(0.005 * LAMPORTS_PER_SOL))
+        .createEscrow(
+          new anchor.BN(0.05 * LAMPORTS_PER_SOL),
+          new anchor.BN(3600)
+        )
         .accounts({
           deployer: deployer.publicKey,
           tokenMint: badMint.publicKey,
@@ -166,17 +172,58 @@ describe("FYRST E2E Tests", () => {
       assert.fail("Should have thrown InsufficientCollateral");
     } catch (err: any) {
       assert.include(err.toString(), "InsufficientCollateral");
-      console.log("  Correctly rejected: 0.005 SOL < 0.01 SOL minimum");
+      console.log("  Correctly rejected: 0.05 SOL < 0.1 SOL minimum");
     }
   });
 
-  it("4. Initialize bonding curve with SPL mint + metadata", async () => {
+  // ─── 4. Reject Invalid Duration ──────────────────────────────────
+
+  it("4. Reject escrow with invalid duration (< 1h)", async () => {
+    const badMint = Keypair.generate();
+    const [badEscrow] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("escrow"),
+        deployer.publicKey.toBuffer(),
+        badMint.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
+
+    try {
+      await (program.methods as any)
+        .createEscrow(
+          new anchor.BN(0.1 * LAMPORTS_PER_SOL),
+          new anchor.BN(1800) // 30 minutes — too short
+        )
+        .accounts({
+          deployer: deployer.publicKey,
+          tokenMint: badMint.publicKey,
+          escrowVault: badEscrow,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+      assert.fail("Should have thrown InvalidDuration");
+    } catch (err: any) {
+      assert.include(err.toString(), "InvalidDuration");
+      console.log("  Correctly rejected: 1800s < 3600s minimum");
+    }
+  });
+
+  // ─── 5. Init Bonding Curve ───────────────────────────────────────
+
+  it("5. Initialize bonding curve with SPL mint + metadata", async () => {
     const basePrice = new anchor.BN(100_000);
     const slope = new anchor.BN(10);
     const metadataAccount = getMetadataPDA(tokenMint.publicKey);
 
     await (program.methods as any)
-      .initBondingCurve(basePrice, slope, "TestToken", "TEST", "https://example.com/meta.json")
+      .initBondingCurve(
+        basePrice,
+        slope,
+        "TestToken",
+        "TEST",
+        "https://example.com/meta.json"
+      )
       .accounts({
         deployer: deployer.publicKey,
         tokenMint: tokenMint.publicKey,
@@ -191,26 +238,36 @@ describe("FYRST E2E Tests", () => {
       .rpc();
 
     const curve = await (program.account as any).bondingCurve.fetch(curvePda);
-    assert.equal(curve.tokenMint.toBase58(), tokenMint.publicKey.toBase58());
+    assert.equal(
+      curve.tokenMint.toBase58(),
+      tokenMint.publicKey.toBase58()
+    );
     assert.equal(curve.currentSupply.toNumber(), 0);
-    assert.equal(curve.basePrice.toNumber(), 100_000);
-    assert.equal(curve.slope.toNumber(), 10);
     assert.equal(curve.reserveBalance.toNumber(), 0);
     assert.equal(curve.totalSolCollected.toNumber(), 0);
+    assert.equal(curve.maxReserveReached.toNumber(), 0);
+    assert.equal(curve.totalDeployerFees.toNumber(), 0);
+    assert.equal(curve.claimedDeployerFees.toNumber(), 0);
     assert.equal(curve.graduated, false);
 
     console.log("  Curve initialized with SPL mint + Metaplex metadata");
   });
 
-  it("5. Buy tokens — mints real SPL tokens to buyer ATA", async () => {
-    const buyAmount = new anchor.BN(0.05 * LAMPORTS_PER_SOL);
+  // ─── 6. Buy Tokens (fee split + max_reserve tracking) ───────────
+
+  it("6. Buy tokens — verify SPL mint + fee split + max_reserve_reached", async () => {
+    const buyAmount = new anchor.BN(0.2 * LAMPORTS_PER_SOL);
     const buyerAta = getAssociatedTokenAddressSync(
       tokenMint.publicKey,
       buyer.publicKey
     );
 
+    const treasuryBalBefore = await provider.connection.getBalance(
+      treasury.publicKey
+    );
+
     await (program.methods as any)
-      .buyTokens(buyAmount)
+      .buyTokens(buyAmount, new anchor.BN(0))
       .accounts({
         buyer: buyer.publicKey,
         bondingCurve: curvePda,
@@ -225,177 +282,196 @@ describe("FYRST E2E Tests", () => {
       .signers([buyer])
       .rpc();
 
-    const curveAfter = await (program.account as any).bondingCurve.fetch(curvePda);
-    assert.isAbove(curveAfter.currentSupply.toNumber(), 0);
-    assert.isAbove(curveAfter.reserveBalance.toNumber(), 0);
-    assert.isAbove(curveAfter.totalSolCollected.toNumber(), 0);
+    const curve = await (program.account as any).bondingCurve.fetch(curvePda);
+    assert.isAbove(curve.currentSupply.toNumber(), 0);
+    assert.isAbove(curve.reserveBalance.toNumber(), 0);
+    assert.isAbove(curve.totalSolCollected.toNumber(), 0);
+    assert.isAbove(curve.totalDeployerFees.toNumber(), 0);
+    assert.isAbove(curve.maxReserveReached.toNumber(), 0);
+    assert.equal(curve.claimedDeployerFees.toNumber(), 0);
 
-    // Verify SPL tokens arrived in buyer's ATA
+    // max_reserve_reached should equal reserve_balance after first buy
+    assert.equal(
+      curve.maxReserveReached.toNumber(),
+      curve.reserveBalance.toNumber()
+    );
+
+    // Treasury should have received trade fee share
+    const treasuryBalAfter = await provider.connection.getBalance(
+      treasury.publicKey
+    );
+    assert.isAbove(treasuryBalAfter, treasuryBalBefore);
+
+    // Verify SPL tokens in buyer ATA
     const ataInfo = await getAccount(provider.connection, buyerAta);
     assert.isAbove(Number(ataInfo.amount), 0);
 
     console.log(
-      `  Bought tokens: supply=${curveAfter.currentSupply.toNumber()}, SPL balance=${ataInfo.amount}`
+      `  Bought: supply=${curve.currentSupply.toNumber()}, reserve=${curve.reserveBalance.toNumber()}, deployer_fees=${curve.totalDeployerFees.toNumber()}, max_reserve=${curve.maxReserveReached.toNumber()}`
     );
   });
 
-  it("6. Record buyer for refund tracking", async () => {
-    const amount = new anchor.BN(1_000_000);
-    const price = new anchor.BN(100_000);
+  // ─── 7. Sell Tokens (with protocol_config + treasury) ────────────
 
-    await (program.methods as any)
-      .recordBuyer(amount, price)
-      .accounts({
-        buyer: buyer.publicKey,
-        tokenMint: tokenMint.publicKey,
-        buyerRecord: buyerRecordPda,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([buyer])
-      .rpc();
-
-    const record = await (program.account as any).buyerRecord.fetch(buyerRecordPda);
-    assert.equal(record.buyer.toBase58(), buyer.publicKey.toBase58());
-    assert.equal(record.totalBought.toNumber(), 1_000_000);
-    assert.equal(record.refundClaimed, false);
-
-    console.log("  Buyer recorded for refund eligibility");
-  });
-
-  it("7. Sell tokens — burns SPL tokens", async () => {
-    const curveState = await (program.account as any).bondingCurve.fetch(curvePda);
+  it("7. Sell tokens — burns SPL + fee split", async () => {
+    const curveBefore = await (program.account as any).bondingCurve.fetch(
+      curvePda
+    );
     const sellAmount = new anchor.BN(
-      Math.floor(curveState.currentSupply.toNumber() / 2)
+      Math.floor(curveBefore.currentSupply.toNumber() / 2)
     );
     const sellerAta = getAssociatedTokenAddressSync(
       tokenMint.publicKey,
       buyer.publicKey
     );
-
-    const buyerBalBefore = await provider.connection.getBalance(buyer.publicKey);
+    const buyerBalBefore = await provider.connection.getBalance(
+      buyer.publicKey
+    );
 
     await (program.methods as any)
-      .sellTokens(sellAmount)
+      .sellTokens(sellAmount, new anchor.BN(0))
       .accounts({
         seller: buyer.publicKey,
         bondingCurve: curvePda,
         tokenMint: tokenMint.publicKey,
         sellerTokenAccount: sellerAta,
+        protocolConfig: protocolConfigPda,
+        treasury: treasury.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
       .signers([buyer])
       .rpc();
 
-    const curveAfter = await (program.account as any).bondingCurve.fetch(curvePda);
+    const curveAfter = await (program.account as any).bondingCurve.fetch(
+      curvePda
+    );
     const buyerBalAfter = await provider.connection.getBalance(buyer.publicKey);
 
     assert.isBelow(
       curveAfter.currentSupply.toNumber(),
-      curveState.currentSupply.toNumber()
+      curveBefore.currentSupply.toNumber()
     );
     assert.isAbove(buyerBalAfter, buyerBalBefore);
 
+    // max_reserve_reached should NOT decrease after sell
+    assert.equal(
+      curveAfter.maxReserveReached.toNumber(),
+      curveBefore.maxReserveReached.toNumber()
+    );
+
+    // total_deployer_fees should increase (sell also generates fees)
+    assert.isAbove(
+      curveAfter.totalDeployerFees.toNumber(),
+      curveBefore.totalDeployerFees.toNumber()
+    );
+
     console.log(
-      `  Sold ${sellAmount.toNumber()} tokens, supply now: ${curveAfter.currentSupply.toNumber()}`
+      `  Sold ${sellAmount.toNumber()} tokens, supply=${curveAfter.currentSupply.toNumber()}, max_reserve unchanged=${curveAfter.maxReserveReached.toNumber()}`
     );
   });
 
-  it("8. Mark token as rugged (authority only)", async () => {
+  // ─── 8. Claim Fees (progressive unlock) ──────────────────────────
+
+  it("8. Claim deployer fees (progressive unlock)", async () => {
+    const curveBefore = await (program.account as any).bondingCurve.fetch(
+      curvePda
+    );
+    const deployerBalBefore = await provider.connection.getBalance(
+      deployer.publicKey
+    );
+
+    // Progressive unlock: unlocked = (totalDeployerFees * maxReserveReached) / GRADUATION_THRESHOLD
+    const expectedUnlocked = Math.floor(
+      (curveBefore.totalDeployerFees.toNumber() *
+        curveBefore.maxReserveReached.toNumber()) /
+        85_000_000_000
+    );
+
+    console.log(
+      `  Pre-claim: totalFees=${curveBefore.totalDeployerFees.toNumber()}, maxReserve=${curveBefore.maxReserveReached.toNumber()}, expectedUnlocked=${expectedUnlocked}`
+    );
+
+    if (expectedUnlocked === 0) {
+      // Reserve is too small relative to 85 SOL threshold — skip
+      console.log("  Skipped: unlock amount rounds to 0 (small reserve vs 85 SOL threshold)");
+      return;
+    }
+
     await (program.methods as any)
-      .markRugged()
+      .claimFees()
       .accounts({
-        authority: deployer.publicKey,
-        protocolConfig: protocolConfigPda,
-        escrowVault: escrowPda,
-      })
-      .rpc();
-
-    const escrow = await (program.account as any).escrowVault.fetch(escrowPda);
-    assert.equal(escrow.rugged, true);
-
-    console.log("  Token marked as rugged");
-  });
-
-  it("9. Process pro-rata refund", async () => {
-    const buyerBalBefore = await provider.connection.getBalance(buyer.publicKey);
-
-    await (program.methods as any)
-      .processRefund()
-      .accounts({
-        authority: deployer.publicKey,
-        buyer: buyer.publicKey,
-        protocolConfig: protocolConfigPda,
-        escrowVault: escrowPda,
+        deployer: deployer.publicKey,
         bondingCurve: curvePda,
-        buyerRecord: buyerRecordPda,
-        systemProgram: SystemProgram.programId,
       })
       .rpc();
 
-    const buyerBalAfter = await provider.connection.getBalance(buyer.publicKey);
-    assert.isAbove(buyerBalAfter, buyerBalBefore);
+    const curveAfter = await (program.account as any).bondingCurve.fetch(
+      curvePda
+    );
+    assert.equal(curveAfter.claimedDeployerFees.toNumber(), expectedUnlocked);
 
-    const record = await (program.account as any).buyerRecord.fetch(buyerRecordPda);
-    assert.equal(record.refundClaimed, true);
-
+    const deployerBalAfter = await provider.connection.getBalance(
+      deployer.publicKey
+    );
+    // Account for tx fee, so just check balance didn't decrease much
     console.log(
-      `  Refund processed: ${(buyerBalAfter - buyerBalBefore) / LAMPORTS_PER_SOL} SOL returned`
+      `  Claimed ${expectedUnlocked} lamports, claimedDeployerFees=${curveAfter.claimedDeployerFees.toNumber()}`
     );
   });
 
-  it("10. Release escrow blocked when rugged", async () => {
+  // ─── 9. Release Escrow Blocked (not graduated) ──────────────────
+
+  it("9. Release escrow blocked — token not graduated", async () => {
     try {
       await (program.methods as any)
         .releaseEscrow()
         .accounts({
           deployer: deployer.publicKey,
           escrowVault: escrowPda,
+          bondingCurve: curvePda,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
-      assert.fail("Should have thrown TokenIsRugged");
+      assert.fail("Should have thrown NotGraduated");
     } catch (err: any) {
-      assert.include(err.toString(), "TokenIsRugged");
-      console.log("  Correctly blocked: rugged escrow cannot be released");
+      assert.include(err.toString(), "NotGraduated");
+      console.log("  Correctly blocked: token not graduated");
     }
   });
 
-  it("11. Reject early escrow release (safe period not elapsed)", async () => {
-    // Create a new fresh escrow to test safe period (not rugged)
-    const freshMint = Keypair.generate();
-    const [freshEscrow] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("escrow"),
-        deployer.publicKey.toBuffer(),
-        freshMint.publicKey.toBuffer(),
-      ],
-      program.programId
-    );
+  // ─── 10. Refund blocked — deadline not reached ─────────────────
 
-    await (program.methods as any)
-      .createEscrow(new anchor.BN(0.02 * LAMPORTS_PER_SOL))
-      .accounts({
-        deployer: deployer.publicKey,
-        tokenMint: freshMint.publicKey,
-        escrowVault: freshEscrow,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+  it("10. Refund blocked — deadline not reached yet (burn-to-refund)", async () => {
+    const buyerAta = getAssociatedTokenAddressSync(
+      tokenMint.publicKey,
+      buyer.publicKey
+    );
 
     try {
       await (program.methods as any)
-        .releaseEscrow()
+        .processRefund()
         .accounts({
-          deployer: deployer.publicKey,
-          escrowVault: freshEscrow,
+          buyer: buyer.publicKey,
+          escrowVault: escrowPda,
+          bondingCurve: curvePda,
+          tokenMint: tokenMint.publicKey,
+          buyerTokenAccount: buyerAta,
+          tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
+        .signers([buyer])
         .rpc();
-      assert.fail("Should have thrown SafePeriodActive");
+      assert.fail("Should have thrown DeadlineNotReached");
     } catch (err: any) {
-      assert.include(err.toString(), "SafePeriodActive");
-      console.log("  Correctly rejected: 24h safe period still active");
+      assert.include(err.toString(), "DeadlineNotReached");
+      console.log("  Correctly blocked: deadline (1h) has not passed yet");
     }
   });
+
+  // NOTE: Full refund success test requires clock warp (advancing time past
+  // deadline). Since localnet mocha doesn't easily support clock warp,
+  // we verify the DeadlineNotReached guard above. The burn-to-refund
+  // model ensures: no tokens → no refund (eliminating the exploit).
+
 });

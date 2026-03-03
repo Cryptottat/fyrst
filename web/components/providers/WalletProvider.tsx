@@ -17,13 +17,13 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 
 interface Props {
   children: ReactNode;
+  rpcEndpoint?: string;
 }
 
-export default function WalletProvider({ children }: Props) {
+export default function WalletProvider({ children, rpcEndpoint }: Props) {
   const endpoint = useMemo(
-    () =>
-      process.env.NEXT_PUBLIC_SOLANA_RPC || clusterApiUrl("devnet"),
-    [],
+    () => rpcEndpoint || clusterApiUrl("devnet"),
+    [rpcEndpoint],
   );
 
   const wallets = useMemo(

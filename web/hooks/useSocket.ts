@@ -20,6 +20,7 @@ export function useSocketInit() {
   const updatePrice = useAppStore((s) => s.updatePrice);
   const prependToken = useAppStore((s) => s.prependToken);
   const updateTokenInList = useAppStore((s) => s.updateTokenInList);
+  const moveTokenToTop = useAppStore((s) => s.moveTokenToTop);
   const setSolPrice = useAppStore((s) => s.setSolPrice);
   const initRef = useRef(false);
 
@@ -58,13 +59,14 @@ export function useSocketInit() {
         bondingCurveProgress: payload.bondingCurveProgress,
       });
 
-      // Also patch the token list so sorting/display stays current
+      // Patch the token list + move to top for LAST TRADE sort
       updateTokenInList(payload.tokenMint, {
         currentPrice: payload.price,
         marketCap: payload.marketCap,
         totalSupply: payload.supply,
         bondingCurveProgress: payload.bondingCurveProgress,
       });
+      moveTokenToTop(payload.tokenMint);
     });
 
     socket.connect();
@@ -78,7 +80,7 @@ export function useSocketInit() {
       socket.disconnect();
       initRef.current = false;
     };
-  }, [setWsConnected, updatePrice, prependToken, updateTokenInList, setSolPrice]);
+  }, [setWsConnected, updatePrice, prependToken, updateTokenInList, moveTokenToTop, setSolPrice]);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,17 +5,17 @@ import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import { COLLATERAL_TIERS, MIN_COLLATERAL } from "@/lib/constants";
+import { COLLATERAL_TIERS, MIN_COLLATERAL, DEADLINE_PRESETS } from "@/lib/constants";
 import { getCollateralTier } from "@/lib/utils";
-import { useAnchorProgram, launchToken } from "@/lib/anchor";
-import { createLaunch } from "@/lib/api";
+import { useAnchorProgram, launchToken, launchAndBuy } from "@/lib/anchor";
+import { createLaunch, recordTrade } from "@/lib/api";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { BN } from "@coral-xyz/anchor";
 import { processImage } from "@/lib/image";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
-type LaunchStatus = "idle" | "signing" | "confirming" | "recording" | "success" | "error";
+type LaunchStatus = "idle" | "signing" | "confirming" | "buying" | "recording" | "success" | "error";
 
 export default function LaunchPage() {
   const router = useRouter();
@@ -28,13 +28,27 @@ export default function LaunchPage() {
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [collateral, setCollateral] = useState(MIN_COLLATERAL);
+  const [durationSeconds, setDurationSeconds] = useState(86_400); // default 24h
+  const [initialBuy, setInitialBuy] = useState("");
+  const [website, setWebsite] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [telegram, setTelegram] = useState("");
 
   const [status, setStatus] = useState<LaunchStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [txSigs, setTxSigs] = useState<{ escrow: string; curve: string } | null>(null);
+  const [txSigs, setTxSigs] = useState<{ launch: string; buy?: string } | null>(null);
 
   const currentTier = getCollateralTier(collateral);
   const isProcessing = status !== "idle" && status !== "success" && status !== "error";
+
+  /** Auto-prefix https:// if user types something like "example.com" */
+  const autoHttps = (val: string): string => {
+    const v = val.trim();
+    if (!v) return v;
+    if (/^https?:\/\//i.test(v)) return v;
+    if (/^[^@\s]+\.[a-z]{2,}/i.test(v)) return `https://${v}`;
+    return v;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,33 +77,75 @@ export default function LaunchPage() {
       const lamports = new BN(Math.floor(collateral * 1e9));
       // On-chain URI max 200 chars — data URLs are too large, use empty string
       const onChainUri = imageUrl.startsWith("data:") ? "" : imageUrl.trim();
+      const initialBuySol = parseFloat(initialBuy);
+
       setStatus("confirming");
-      const result = await launchToken(
-        program,
-        publicKey,
-        lamports,
-        name.trim(),
-        symbol.trim().toUpperCase(),
-        onChainUri,
-      );
+
+      const duration = new BN(durationSeconds);
+
+      let result;
+      if (initialBuySol > 0) {
+        // Single TX: escrow + curve + buy + record (1 wallet approval)
+        const buyLamports = new BN(Math.floor(initialBuySol * 1e9));
+        result = await launchAndBuy(
+          program,
+          publicKey,
+          lamports,
+          name.trim(),
+          symbol.trim().toUpperCase(),
+          onChainUri,
+          buyLamports,
+          duration,
+        );
+      } else {
+        // Launch only: escrow + curve (1 wallet approval)
+        result = await launchToken(
+          program,
+          publicKey,
+          lamports,
+          name.trim(),
+          symbol.trim().toUpperCase(),
+          onChainUri,
+          duration,
+        );
+      }
+
       const mintAddress = result.tokenMintKeypair.publicKey.toBase58();
-      const escrowSig = result.escrowTxSig;
-      const curveSig = result.curveTxSig;
-      setTxSigs({ escrow: escrowSig, curve: curveSig });
+      setTxSigs({ launch: result.txSig });
 
       setStatus("recording");
+
+      // Encode social links into description
+      let fullDescription = description.trim();
+      const social = { website: website.trim(), twitter: twitter.trim(), telegram: telegram.trim() };
+      if (social.website || social.twitter || social.telegram) {
+        fullDescription += `\n<!--social:${JSON.stringify(social)}-->`;
+      }
 
       await createLaunch({
         mint: mintAddress,
         name: name.trim(),
         symbol: symbol.trim().toUpperCase(),
-        description: description.trim(),
+        description: fullDescription,
         imageUrl: imageUrl.trim(),
         deployerAddress: publicKey.toBase58(),
         collateralAmount: collateral,
-        escrowTxSignature: escrowSig,
-        curveTxSignature: curveSig,
+        durationSeconds,
+        escrowTxSignature: result.txSig,
+        curveTxSignature: result.txSig,
       });
+
+      // Record initial buy in API (already happened on-chain)
+      if (initialBuySol > 0) {
+        await recordTrade({
+          tokenMint: mintAddress,
+          traderAddress: publicKey.toBase58(),
+          side: "buy",
+          amount: initialBuySol,
+          txSignature: result.txSig,
+          solAmount: initialBuySol,
+        });
+      }
 
       setStatus("success");
       setTimeout(() => router.push(`/token/${mintAddress}`), 2000);
@@ -174,9 +230,10 @@ export default function LaunchPage() {
                 </label>
                 <span className="text-text-muted text-[9px] mt-1">OR</span>
                 <input
-                  type="url"
+                  type="text"
                   value={imageUrl.startsWith("data:") ? "" : imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
+                  onBlur={(e) => { const v = autoHttps(e.target.value); if (v !== e.target.value) setImageUrl(v); }}
                   placeholder="URL..."
                   disabled={isProcessing}
                   className={`flex-1 ${inputClass}`}
@@ -199,6 +256,39 @@ export default function LaunchPage() {
                   </button>
                 </div>
               )}
+            </div>
+
+            <div>
+              <label className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+                LINKS (OPTIONAL)
+              </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  onBlur={(e) => setWebsite(autoHttps(e.target.value))}
+                  placeholder="Website URL..."
+                  disabled={isProcessing}
+                  className={inputClass}
+                />
+                <input
+                  type="text"
+                  value={twitter}
+                  onChange={(e) => setTwitter(e.target.value)}
+                  placeholder="Twitter @handle or URL..."
+                  disabled={isProcessing}
+                  className={inputClass}
+                />
+                <input
+                  type="text"
+                  value={telegram}
+                  onChange={(e) => setTelegram(e.target.value)}
+                  placeholder="Telegram @group or URL..."
+                  disabled={isProcessing}
+                  className={inputClass}
+                />
+              </div>
             </div>
 
             <div>
@@ -227,18 +317,63 @@ export default function LaunchPage() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+                DEADLINE
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {DEADLINE_PRESETS.map((preset) => (
+                  <button key={preset.seconds} type="button" onClick={() => setDurationSeconds(preset.seconds)}
+                    disabled={isProcessing}
+                    className={`text-[8px] font-display px-3 py-1.5 border-2 transition-colors cursor-pointer disabled:opacity-50 ${
+                      durationSeconds === preset.seconds
+                        ? "border-primary text-primary bg-primary/10 neon-text-subtle"
+                        : "border-border text-text-muted hover:border-border-hover"
+                    }`}>
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[9px] text-text-muted mt-1 font-mono">
+                <span className="text-primary">&gt; </span>
+                If your token doesn&apos;t graduate before the deadline, buyers can claim refunds from your collateral.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="initialBuy" className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+                INITIAL BUY (SOL) — OPTIONAL
+              </label>
+              <input
+                id="initialBuy"
+                type="number"
+                min={0}
+                step="any"
+                value={initialBuy}
+                onChange={(e) => setInitialBuy(e.target.value)}
+                placeholder="0 (skip)"
+                disabled={isProcessing}
+                className={inputClass}
+              />
+              <p className="text-[9px] text-text-muted mt-1 font-mono">
+                <span className="text-primary">&gt; </span>
+                Buy tokens in the same transaction as launch. 1 wallet approval total.
+              </p>
+            </div>
+
             {/* TX Status */}
             {status !== "idle" && (
               <div className={`arcade-border p-4 ${
                 status === "error" ? "border-error" : status === "success" ? "border-success" : "border-primary"
               }`}>
                 <div className="flex items-center gap-3">
-                  {(status === "signing" || status === "confirming" || status === "recording") && (
+                  {(status === "signing" || status === "confirming" || status === "buying" || status === "recording") && (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-primary" />
                       <span className="text-[10px] font-display text-text-primary">
                         {status === "signing" ? "WAITING FOR WALLET..." :
-                         status === "confirming" ? "CREATING ON-CHAIN..." : "RECORDING..."}
+                         status === "confirming" ? "LAUNCHING ON-CHAIN..." :
+                         status === "buying" ? "PROCESSING..." : "RECORDING..."}
                       </span>
                     </>
                   )}
@@ -259,8 +394,8 @@ export default function LaunchPage() {
                 </div>
                 {txSigs && (
                   <div className="mt-2 text-[10px] text-text-muted font-mono">
-                    <p>Escrow: {txSigs.escrow.slice(0, 20)}...</p>
-                    <p>Curve: {txSigs.curve.slice(0, 20)}...</p>
+                    <p>Launch: {txSigs.launch.slice(0, 20)}...</p>
+                    {txSigs.buy && <p>Buy: {txSigs.buy.slice(0, 20)}...</p>}
                   </div>
                 )}
               </div>

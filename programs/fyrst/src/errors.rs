@@ -2,14 +2,14 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum FyrstError {
-    #[msg("Collateral amount is below minimum (1 SOL)")]
+    #[msg("Collateral amount is below minimum (0.1 SOL)")]
     InsufficientCollateral,
 
-    #[msg("Safe period has not ended yet")]
-    SafePeriodActive,
+    #[msg("Token has not graduated yet")]
+    NotGraduated,
 
-    #[msg("Safe period has already ended")]
-    SafePeriodExpired,
+    #[msg("Deadline has not been reached yet")]
+    DeadlineNotReached,
 
     #[msg("Unauthorized: not the escrow owner")]
     Unauthorized,
@@ -26,27 +26,24 @@ pub enum FyrstError {
     #[msg("Bonding curve already graduated")]
     AlreadyGraduated,
 
-    #[msg("Refund already processed")]
-    RefundAlreadyProcessed,
-
-    #[msg("No buyer record found")]
-    NoBuyerRecord,
-
     #[msg("Math overflow")]
     MathOverflow,
 
     #[msg("Invalid price calculation")]
     InvalidPrice,
 
-    #[msg("Token has been rugged — escrow release blocked")]
-    TokenIsRugged,
-
-    #[msg("Escrow is already marked as rugged")]
-    EscrowIsRugged,
-
     #[msg("Invalid metadata: name/symbol/URI exceeds length limit")]
     InvalidMetadata,
 
     #[msg("Token mint does not match bonding curve")]
     TokenMintMismatch,
+
+    #[msg("Slippage tolerance exceeded")]
+    SlippageExceeded,
+
+    #[msg("Duration out of allowed range (1h–7d)")]
+    InvalidDuration,
+
+    #[msg("No fees to claim")]
+    NoFeesToClaim,
 }

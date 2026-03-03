@@ -29,6 +29,7 @@ interface AppState {
   setTokens: (tokens: ApiToken[]) => void;
   prependToken: (token: ApiToken) => void;
   updateTokenInList: (mint: string, patch: Partial<ApiToken>) => void;
+  moveTokenToTop: (mint: string) => void;
 
   // Trades (token detail page)
   trades: ApiTrade[];
@@ -80,6 +81,13 @@ export const useAppStore = create<AppState>()((set) => ({
         t.mint === mint ? { ...t, ...patch } : t,
       ),
     })),
+  moveTokenToTop: (mint) =>
+    set((state) => {
+      const idx = state.tokens.findIndex((t) => t.mint === mint);
+      if (idx <= 0) return state;
+      const token = state.tokens[idx];
+      return { tokens: [token, ...state.tokens.filter((t) => t.mint !== mint)] };
+    }),
 
   // -- Trades ---------------------------------------------------------------
   trades: [],

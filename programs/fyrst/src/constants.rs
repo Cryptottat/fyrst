@@ -1,14 +1,20 @@
-/// Minimum collateral in lamports (0.01 SOL = 10_000_000 lamports)
-pub const MIN_COLLATERAL: u64 = 10_000_000;
+/// Minimum collateral in lamports (0.1 SOL)
+pub const MIN_COLLATERAL: u64 = 100_000_000;
 
-/// Safe period in seconds (24 hours)
-pub const SAFE_PERIOD: i64 = 24 * 60 * 60;
+/// Minimum escrow duration in seconds (1 hour)
+pub const MIN_DURATION: i64 = 3_600;
 
-/// Protocol fee in basis points (0.5% = 50 bps)
-pub const PROTOCOL_FEE_BPS: u64 = 50;
+/// Maximum escrow duration in seconds (7 days)
+pub const MAX_DURATION: i64 = 604_800;
 
-/// Trade fee in basis points (1% = 100 bps)
+/// Protocol fee in basis points (0% — folded into trade fee split)
+pub const PROTOCOL_FEE_BPS: u64 = 0;
+
+/// Trade fee in basis points (1% = 100 bps, split 50/50: deployer + treasury)
 pub const TRADE_FEE_BPS: u64 = 100;
+
+/// Deployer fee share in basis points (50 = 0.5% of trade volume)
+pub const DEPLOYER_FEE_BPS: u64 = 50;
 
 /// Deploy fee in lamports (0.02 SOL)
 pub const DEPLOY_FEE: u64 = 20_000_000;
@@ -18,9 +24,6 @@ pub const ESCROW_SEED: &[u8] = b"escrow";
 
 /// Bonding curve PDA seed
 pub const CURVE_SEED: &[u8] = b"curve";
-
-/// Buyer record PDA seed
-pub const BUYER_SEED: &[u8] = b"record";
 
 /// Basis points denominator
 pub const BPS_DENOMINATOR: u64 = 10_000;

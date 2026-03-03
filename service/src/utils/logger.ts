@@ -8,7 +8,8 @@ const LOG_LEVELS = {
 type LogLevel = keyof typeof LOG_LEVELS;
 
 const currentLevel: LogLevel =
-  (process.env.LOG_LEVEL as LogLevel) || "info";
+  (process.env.LOG_LEVEL as LogLevel) ||
+  (process.env.NODE_ENV === "production" ? "info" : "debug");
 
 function shouldLog(level: LogLevel): boolean {
   return LOG_LEVELS[level] <= LOG_LEVELS[currentLevel];

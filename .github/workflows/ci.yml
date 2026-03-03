@@ -26,7 +26,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://api.fyrst.fun
           NEXT_PUBLIC_WS_URL: wss://api.fyrst.fun
-          NEXT_PUBLIC_SOLANA_RPC: https://mainnet.helius-rpc.com
+          NEXT_PUBLIC_SOLANA_RPC: https://api.devnet.solana.com
           NEXT_PUBLIC_SITE_URL: https://fyrst.fun
 
   backend:

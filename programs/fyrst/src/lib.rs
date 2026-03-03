@@ -21,15 +21,16 @@ pub mod fyrst {
         instructions::protocol::init_protocol(ctx, treasury)
     }
 
-    /// Initialize escrow vault for a deployer's token launch
+    /// Initialize escrow vault with deployer collateral and custom deadline
     pub fn create_escrow(
         ctx: Context<CreateEscrow>,
         collateral_amount: u64,
+        duration_seconds: i64,
     ) -> Result<()> {
-        instructions::escrow::create_escrow(ctx, collateral_amount)
+        instructions::escrow::create_escrow(ctx, collateral_amount, duration_seconds)
     }
 
-    /// Release escrow after safe period (deployer reclaims)
+    /// Release escrow back to deployer (requires token graduation)
     pub fn release_escrow(ctx: Context<ReleaseEscrow>) -> Result<()> {
         instructions::escrow::release_escrow(ctx)
     }
@@ -50,35 +51,36 @@ pub mod fyrst {
     pub fn buy_tokens(
         ctx: Context<BuyTokens>,
         sol_amount: u64,
+        min_tokens_out: u64,
     ) -> Result<()> {
-        instructions::bonding_curve::buy_tokens(ctx, sol_amount)
+        instructions::bonding_curve::buy_tokens(ctx, sol_amount, min_tokens_out)
     }
 
     /// Sell tokens on the bonding curve (burns SPL tokens)
     pub fn sell_tokens(
         ctx: Context<SellTokens>,
         token_amount: u64,
+        min_sol_out: u64,
     ) -> Result<()> {
-        instructions::bonding_curve::sell_tokens(ctx, token_amount)
+        instructions::bonding_curve::sell_tokens(ctx, token_amount, min_sol_out)
     }
 
-    /// Record a buyer for refund eligibility tracking
-    pub fn record_buyer(
-        ctx: Context<RecordBuyer>,
-        amount: u64,
-        price: u64,
-    ) -> Result<()> {
-        instructions::refund::record_buyer(ctx, amount, price)
-    }
-
-    /// Process pro-rata refund for a buyer (called by protocol authority)
+    /// Process burn-to-refund for a buyer (permissionless — buyer claims own refund)
     pub fn process_refund(ctx: Context<ProcessRefund>) -> Result<()> {
         instructions::refund::process_refund(ctx)
     }
 
-    /// Mark a token as rugged (authority only)
-    pub fn mark_rugged(ctx: Context<MarkRugged>) -> Result<()> {
-        instructions::protocol::mark_rugged(ctx)
+    /// Update protocol treasury (authority only)
+    pub fn update_treasury(
+        ctx: Context<UpdateTreasury>,
+        new_treasury: Pubkey,
+    ) -> Result<()> {
+        instructions::protocol::update_treasury(ctx, new_treasury)
+    }
+
+    /// Claim accumulated trade fees (deployer only)
+    pub fn claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
+        instructions::protocol::claim_fees(ctx)
     }
 
     /// Graduate a bonding curve when reserve meets threshold

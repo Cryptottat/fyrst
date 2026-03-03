@@ -14,9 +14,11 @@ export enum ReputationRank {
 }
 
 export enum CollateralTier {
+  Iron = "Iron",
   Bronze = "Bronze",
   Silver = "Silver",
   Gold = "Gold",
+  Platinum = "Platinum",
   Diamond = "Diamond",
 }
 
@@ -138,17 +140,19 @@ export interface PaginatedResponse<T> {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-export const MIN_COLLATERAL = 1; // SOL
-export const SAFE_PERIOD = 24 * 60 * 60; // 24 hours in seconds
+export const MIN_COLLATERAL = 0.1; // SOL
+export const MIN_DURATION = 3_600; // 1 hour
+export const MAX_DURATION = 604_800; // 7 days
 export const DEPLOY_FEE = 0.02; // SOL
-export const PROTOCOL_FEE = 0.005; // 0.5%
-export const TRADE_FEE = 0.01; // 1% (0.5% buyback + 0.5% refund pool)
+export const TRADE_FEE = 0.01; // 1% (split 50/50: deployer + treasury)
 
 export const COLLATERAL_TIERS: Record<CollateralTier, number> = {
-  [CollateralTier.Bronze]: 1,
-  [CollateralTier.Silver]: 5,
-  [CollateralTier.Gold]: 10,
-  [CollateralTier.Diamond]: 25,
+  [CollateralTier.Iron]: 0.1,
+  [CollateralTier.Bronze]: 0.5,
+  [CollateralTier.Silver]: 1,
+  [CollateralTier.Gold]: 3,
+  [CollateralTier.Platinum]: 5,
+  [CollateralTier.Diamond]: 10,
 };
 
 export const HOLDER_TIERS: Record<HolderTier, number> = {

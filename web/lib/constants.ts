@@ -56,20 +56,29 @@ export const TIERS = [
 
 /** Collateral tier definitions */
 export const COLLATERAL_TIERS = [
-  { name: "Bronze", amount: 1, label: "1 SOL" },
-  { name: "Silver", amount: 5, label: "5 SOL" },
-  { name: "Gold", amount: 10, label: "10 SOL" },
-  { name: "Diamond", amount: 25, label: "25+ SOL" },
+  { name: "Iron", amount: 0.1, label: "0.1 SOL" },
+  { name: "Bronze", amount: 0.5, label: "0.5 SOL" },
+  { name: "Silver", amount: 1, label: "1 SOL" },
+  { name: "Gold", amount: 3, label: "3 SOL" },
+  { name: "Platinum", amount: 5, label: "5 SOL" },
+  { name: "Diamond", amount: 10, label: "10 SOL" },
 ] as const;
 
 /** Minimum collateral in SOL required to launch a token */
-export const MIN_COLLATERAL = 0.01;
+export const MIN_COLLATERAL = 0.1;
 
-/** Safe period duration in seconds (24 hours) */
-export const SAFE_PERIOD = 24 * 60 * 60;
+/** Deadline duration presets (seconds) */
+export const DEADLINE_PRESETS = [
+  { label: "1 HOUR", seconds: 3_600 },
+  { label: "6 HOURS", seconds: 21_600 },
+  { label: "12 HOURS", seconds: 43_200 },
+  { label: "24 HOURS", seconds: 86_400 },
+  { label: "3 DAYS", seconds: 259_200 },
+  { label: "7 DAYS", seconds: 604_800 },
+] as const;
 
-/** Protocol fee as a decimal (0.5%) */
-export const PROTOCOL_FEE = 0.005;
+/** Protocol fee as a decimal (0% — folded into 1% trade fee split) */
+export const PROTOCOL_FEE = 0;
 
 /** Trade fee as a decimal (1%) */
 export const TRADE_FEE = 0.01;

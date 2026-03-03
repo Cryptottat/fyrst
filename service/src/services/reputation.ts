@@ -41,9 +41,10 @@ export function computeScore(input: ReputationInput): number {
   // Rug pull penalty
   score -= input.rugPulls * 20;
 
-  // Collateral tier bonus
+  // Collateral tier bonus (Gold, Platinum, Diamond)
   if (
     input.collateralTier === CollateralTier.Gold ||
+    input.collateralTier === CollateralTier.Platinum ||
     input.collateralTier === CollateralTier.Diamond
   ) {
     score += 10;

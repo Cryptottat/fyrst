@@ -142,6 +142,16 @@ img[data-pixel] {
   animation: pulse-glow 2s steps(4) infinite;
 }
 
+/* ── Card Flash (LAST TRADE sort) ─────────────────────────────── */
+@keyframes card-flash {
+  0% { box-shadow: 0 0 0 rgba(167, 139, 250, 0); border-color: var(--color-primary); }
+  20% { box-shadow: 0 0 30px rgba(167, 139, 250, 0.6), 0 0 60px rgba(167, 139, 250, 0.3); border-color: var(--color-primary); }
+  100% { box-shadow: 0 0 0 rgba(167, 139, 250, 0); border-color: var(--color-border); }
+}
+.animate-card-flash {
+  animation: card-flash 1.5s ease-out 1;
+}
+
 /* ── P1 cursor blink ──────────────────────────────────────────── */
 @keyframes p1-blink {
   0%, 100% { opacity: 1; }
@@ -174,4 +184,20 @@ img[data-pixel] {
 ::selection {
   background: rgba(167, 139, 250, 0.3);
   color: #fff;
+}
+
+/* ── Marquee animations ──────────────────────────────────────── */
+@keyframes marquee-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes marquee-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+.marquee-left {
+  animation: marquee-left 30s linear infinite;
+}
+.marquee-right {
+  animation: marquee-right 30s linear infinite;
 }

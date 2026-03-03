@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { prisma, dbConnected } from "../lib/prisma";
 import { logger } from "../utils/logger";
 import { validateBody } from "../middleware/validate";
+import { tradeLimiter } from "../middleware/rateLimiter";
 import { createTradeSchema } from "../schemas";
 import {
   calculateBuyCost,
@@ -58,6 +59,7 @@ tradeRouter.get(
 
 tradeRouter.post(
   "/",
+  tradeLimiter,
   validateBody(createTradeSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -161,6 +163,7 @@ tradeRouter.post(
           marketCap: newMarketCap,
           bondingCurveProgress: progress,
           graduated,
+          lastTradeAt: new Date(),
         },
       });
 

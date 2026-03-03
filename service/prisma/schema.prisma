@@ -44,19 +44,25 @@ model Token {
   marketCap           Float    @default(0) @map("market_cap")
   currentPrice        Float    @default(0) @map("current_price")
   totalSupply         Float    @default(0) @map("total_supply")
-  collateralTier      String   @default("Bronze") @map("collateral_tier") @db.VarChar(10)
+  collateralAmount    Float    @default(0) @map("collateral_amount")
+  collateralTier      String   @default("Iron") @map("collateral_tier") @db.VarChar(10)
+  deadlineTimestamp   DateTime? @map("deadline_timestamp")
   graduated           Boolean  @default(false)
   bondingCurveProgress Float   @default(0) @map("bonding_curve_progress")
   createdAt           DateTime @default(now()) @map("created_at")
+
+  lastTradeAt         DateTime? @map("last_trade_at")
 
   deployer     Deployer      @relation(fields: [deployerAddress], references: [address])
   trades       Trade[]
   refunds      Refund[]
   buyerRecords BuyerRecord[]
+  comments     Comment[]
 
   @@index([deployerAddress])
   @@index([createdAt])
   @@index([marketCap])
+  @@index([lastTradeAt])
   @@map("tokens")
 }
 
@@ -119,4 +125,22 @@ model BuyerRecord {
   @@unique([buyerAddress, tokenMint])
   @@index([buyerAddress])
   @@map("buyer_records")
+}
+
+// ---------------------------------------------------------------------------
+// Comments (wallet-signed, stored on backend)
+// ---------------------------------------------------------------------------
+model Comment {
+  id             String   @id @default(uuid())
+  tokenMint      String   @map("token_mint") @db.VarChar(64)
+  walletAddress  String   @map("wallet_address") @db.VarChar(64)
+  content        String   @db.VarChar(500)
+  signature      String   @db.VarChar(128)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  token Token @relation(fields: [tokenMint], references: [mint])
+
+  @@index([tokenMint])
+  @@index([createdAt])
+  @@map("comments")
 }

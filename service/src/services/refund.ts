@@ -6,8 +6,7 @@ import { prisma, dbConnected } from "../lib/prisma";
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Refund safe period: 24 hours in milliseconds */
-const SAFE_PERIOD_MS = 24 * 60 * 60 * 1000;
+// No longer using fixed safe period — deadline is per-token
 
 // ---------------------------------------------------------------------------
 // Eligibility
@@ -16,9 +15,10 @@ const SAFE_PERIOD_MS = 24 * 60 * 60 * 1000;
 /**
  * Check whether a holder is eligible for a refund.
  * Eligibility rules:
- *  1. The token must have been created within the safe period (24h).
- *  2. The holder must have a buyer record with a positive balance.
- *  3. The holder must not already have a pending/completed refund.
+ *  1. The token must NOT have graduated.
+ *  2. The deadline must have passed.
+ *  3. The holder must have a buyer record with a positive balance.
+ *  4. The holder must not already have a pending/completed refund.
  */
 export async function checkRefundEligibility(
   tokenMint: string,
@@ -43,13 +43,21 @@ export async function checkRefundEligibility(
       return { eligible: false, amountSol: 0, reason: "Token not found" };
     }
 
-    // 2. Check safe period
-    const tokenAge = Date.now() - token.createdAt.getTime();
-    if (tokenAge > SAFE_PERIOD_MS) {
+    // 2. Token must not have graduated
+    if (token.graduated) {
       return {
         eligible: false,
         amountSol: 0,
-        reason: "Safe period (24h) has expired",
+        reason: "Token has graduated — no refund available",
+      };
+    }
+
+    // 3. Deadline must have passed
+    if (token.deadlineTimestamp && Date.now() < token.deadlineTimestamp.getTime()) {
+      return {
+        eligible: false,
+        amountSol: 0,
+        reason: "Deadline has not passed yet",
       };
     }
 

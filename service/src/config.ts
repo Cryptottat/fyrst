@@ -5,6 +5,7 @@ export const config = {
   port: parseInt(process.env.PORT || "8000", 10),
   corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:3000").split(","),
   nodeEnv: process.env.NODE_ENV || "development",
+  logLevel: process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug"),
   // Solana
   solanaRpc: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
   heliusApiKey: process.env.HELIUS_API_KEY || "",
@@ -17,4 +18,12 @@ export const config = {
   // Database
   databaseUrl: process.env.DATABASE_URL || "",
   redisUrl: process.env.REDIS_URL || "",
+  // Buyback
+  buybackTokenMint: process.env.BUYBACK_TOKEN_MINT || "", // $FYRST pump.fun CA
+  treasuryPrivateKey: process.env.TREASURY_PRIVATE_KEY || "", // treasury wallet keypair (base58)
+  buybackPct: parseInt(process.env.BUYBACK_PCT || "30", 10), // % of treasury fees used for buyback
+  buybackIntervalMs: parseInt(process.env.BUYBACK_INTERVAL_MS || "60000", 10), // 1 minute default
+  buybackMinSol: parseFloat(process.env.BUYBACK_MIN_SOL || "0.01"), // min SOL threshold to trigger buyback
+  // Program
+  programId: process.env.PROGRAM_ID || "CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP",
 };

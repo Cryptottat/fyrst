@@ -9,6 +9,11 @@
 - 톤: Fortified, Institutional, Metallic, Blueprint
 - 참조: Coinbase(신뢰), 1Password(금고/보안), Linear(미니멀 다크)
 
+## 환경변수 명세 (Feature Flags)
+- `NEXT_PUBLIC_ENABLE_PHASE1_HOOK`: [1차 후킹 기능 설명]
+- `NEXT_PUBLIC_ENABLE_PHASE2_HOOK`: [2차 후킹 기능 설명]
+(이 변수들은 코드에 연동되어야 하며, 유저가 "내가 읽을 문서.md"를 보고 제어합니다.)
+
 ## 현재 진행 상태
 - 완료: Phase 1 (프로젝트 구조) -- commit 639b3b4
 - 완료: Phase 2 (캐릭터/이미지) -- 20개 브랜드 이미지, 파비콘, OG 이미지

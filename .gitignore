@@ -44,3 +44,7 @@ programs/target/
 new_project_guide/
 .vercel
 test-ledger/
+
+# Local secrets (API keys, private keys)
+.local-secrets
+github/

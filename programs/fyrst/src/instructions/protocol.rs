@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::state::{ProtocolConfig, EscrowVault, BondingCurve};
+use crate::state::{ProtocolConfig, BondingCurve};
 use crate::errors::FyrstError;
 use crate::constants::*;
 
@@ -24,19 +24,45 @@ pub fn init_protocol(
     Ok(())
 }
 
-/// Mark a token as rugged (authority only)
-pub fn mark_rugged(ctx: Context<MarkRugged>) -> Result<()> {
-    let escrow = &mut ctx.accounts.escrow_vault;
+/// Update protocol treasury (authority only)
+pub fn update_treasury(ctx: Context<UpdateTreasury>, new_treasury: Pubkey) -> Result<()> {
+    let config = &mut ctx.accounts.protocol_config;
+    config.treasury = new_treasury;
 
-    require!(!escrow.rugged, FyrstError::EscrowIsRugged);
+    msg!("Treasury updated to: {}", new_treasury);
+    Ok(())
+}
 
-    escrow.rugged = true;
+/// Claim accumulated trade fees with progressive unlock (deployer only)
+/// unlocked = (total_deployer_fees * max_reserve_reached) / GRADUATION_THRESHOLD
+/// claimable = unlocked - claimed_deployer_fees
+pub fn claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
+    let curve = &ctx.accounts.bonding_curve;
+    let threshold = GRADUATION_THRESHOLD as u128;
 
-    msg!(
-        "Token marked as rugged: mint={}, deployer={}",
-        escrow.token_mint,
-        escrow.deployer
-    );
+    let unlocked = (curve.total_deployer_fees as u128)
+        .checked_mul(curve.max_reserve_reached as u128)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_div(threshold)
+        .ok_or(FyrstError::MathOverflow)? as u64;
+
+    let claimable = unlocked
+        .checked_sub(curve.claimed_deployer_fees)
+        .ok_or(FyrstError::MathOverflow)?;
+
+    require!(claimable > 0, FyrstError::NoFeesToClaim);
+
+    // Transfer claimable fees from curve PDA to deployer
+    **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= claimable;
+    **ctx.accounts.deployer.to_account_info().try_borrow_mut_lamports()? += claimable;
+
+    let curve_mut = &mut ctx.accounts.bonding_curve;
+    curve_mut.claimed_deployer_fees = curve_mut
+        .claimed_deployer_fees
+        .checked_add(claimable)
+        .ok_or(FyrstError::MathOverflow)?;
+
+    msg!("Fees claimed: deployer={}, amount={}", ctx.accounts.deployer.key(), claimable);
 
     Ok(())
 }
@@ -81,24 +107,34 @@ pub struct InitProtocol<'info> {
 }
 
 #[derive(Accounts)]
-pub struct MarkRugged<'info> {
+pub struct UpdateTreasury<'info> {
     #[account(
         constraint = authority.key() == protocol_config.authority @ FyrstError::Unauthorized
     )]
     pub authority: Signer<'info>,
 
     #[account(
+        mut,
         seeds = [PROTOCOL_SEED],
         bump = protocol_config.bump,
     )]
     pub protocol_config: Account<'info, ProtocolConfig>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimFees<'info> {
+    #[account(
+        mut,
+        constraint = deployer.key() == bonding_curve.deployer @ FyrstError::Unauthorized
+    )]
+    pub deployer: Signer<'info>,
 
     #[account(
         mut,
-        seeds = [ESCROW_SEED, escrow_vault.deployer.as_ref(), escrow_vault.token_mint.as_ref()],
-        bump = escrow_vault.bump,
+        seeds = [CURVE_SEED, bonding_curve.token_mint.as_ref()],
+        bump = bonding_curve.bump,
     )]
-    pub escrow_vault: Account<'info, EscrowVault>,
+    pub bonding_curve: Account<'info, BondingCurve>,
 }
 
 #[derive(Accounts)]

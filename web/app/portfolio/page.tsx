@@ -5,7 +5,7 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { fetchPortfolio, type ApiPortfolio, type ApiPortfolioHolding } from "@/lib/api";
-import { useAnchorProgram, fetchBondingCurve, fetchBuyerRecord } from "@/lib/anchor";
+import { useAnchorProgram, fetchBondingCurve } from "@/lib/anchor";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
@@ -43,11 +43,10 @@ export default function PortfolioPage() {
             try {
               const mintPubkey = new PublicKey(h.tokenMint);
               const curve = await fetchBondingCurve(program, mintPubkey);
-              const record = await fetchBuyerRecord(program, publicKey, mintPubkey);
               const currentPrice = curve
                 ? curve.basePrice.add(curve.slope.mul(curve.currentSupply)).toNumber() / 1e9
                 : h.avgBuyPrice;
-              const onChainBalance = record ? record.totalBought.toNumber() : h.balance;
+              const onChainBalance = h.balance;
               const costBasis = onChainBalance * h.avgBuyPrice;
               const currentValue = onChainBalance * currentPrice;
               const onChainPnl = costBasis > 0 ? ((currentValue - costBasis) / costBasis) * 100 : 0;

@@ -12,10 +12,10 @@ pub struct EscrowVault {
     pub collateral_amount: u64,
     /// Timestamp when escrow was created
     pub created_at: i64,
+    /// Deadline timestamp (created_at + duration_seconds)
+    pub deadline_timestamp: i64,
     /// Whether the escrow has been released back to deployer
     pub released: bool,
-    /// Whether a rug was detected (triggers refund mode)
-    pub rugged: bool,
     /// Bump seed for PDA
     pub bump: u8,
 }
@@ -26,8 +26,8 @@ impl EscrowVault {
         + 32  // token_mint
         + 8   // collateral_amount
         + 8   // created_at
+        + 8   // deadline_timestamp
         + 1   // released
-        + 1   // rugged
         + 1;  // bump
 }
 
@@ -51,12 +51,18 @@ pub struct BondingCurve {
     pub deployer: Pubkey,
     /// Total SOL ever collected (for pro-rata refund denominator, never decreases)
     pub total_sol_collected: u64,
+    /// High-water mark of reserve_balance (capped at GRADUATION_THRESHOLD)
+    pub max_reserve_reached: u64,
+    /// Total deployer fees accumulated (50% of trade fees)
+    pub total_deployer_fees: u64,
+    /// Deployer fees already claimed
+    pub claimed_deployer_fees: u64,
     /// Bump seed for PDA
     pub bump: u8,
 }
 
 impl BondingCurve {
-    pub const LEN: usize = 8  // discriminator
+    pub const LEN: usize = 8   // discriminator
         + 32  // token_mint
         + 8   // current_supply
         + 8   // base_price
@@ -65,6 +71,9 @@ impl BondingCurve {
         + 1   // graduated
         + 32  // deployer
         + 8   // total_sol_collected
+        + 8   // max_reserve_reached
+        + 8   // total_deployer_fees
+        + 8   // claimed_deployer_fees
         + 1;  // bump
 }
 
@@ -72,7 +81,7 @@ impl BondingCurve {
 #[account]
 #[derive(Default)]
 pub struct ProtocolConfig {
-    /// Authority that can call mark_rugged
+    /// Protocol authority (admin operations)
     pub authority: Pubkey,
     /// Treasury wallet for protocol fee collection
     pub treasury: Pubkey,
@@ -90,36 +99,3 @@ impl ProtocolConfig {
         + 1;  // bump
 }
 
-/// Buyer record for refund eligibility
-#[account]
-#[derive(Default)]
-pub struct BuyerRecord {
-    /// Buyer wallet address
-    pub buyer: Pubkey,
-    /// Token mint address
-    pub token_mint: Pubkey,
-    /// Total tokens bought
-    pub total_bought: u64,
-    /// Total SOL spent
-    pub total_sol_spent: u64,
-    /// Average buy price in lamports
-    pub avg_price: u64,
-    /// Whether refund has been claimed
-    pub refund_claimed: bool,
-    /// Timestamp of first purchase
-    pub first_buy_at: i64,
-    /// Bump seed for PDA
-    pub bump: u8,
-}
-
-impl BuyerRecord {
-    pub const LEN: usize = 8  // discriminator
-        + 32  // buyer
-        + 32  // token_mint
-        + 8   // total_bought
-        + 8   // total_sol_spent
-        + 8   // avg_price
-        + 1   // refund_claimed
-        + 8   // first_buy_at
-        + 1;  // bump
-}

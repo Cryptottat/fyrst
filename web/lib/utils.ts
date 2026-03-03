@@ -70,11 +70,30 @@ export function getReputationGrade(score: number): string {
 }
 
 /**
+ * Format a price (in SOL) for display — handles very small values.
+ */
+export function formatPrice(price: number): string {
+  if (!price || !isFinite(price)) return "0";
+  if (price >= 1) return price.toFixed(4);
+  if (price >= 0.001) return price.toFixed(6);
+  // For very small prices, find significant digits
+  const str = price.toFixed(20);
+  // Count leading zeros after "0."
+  const match = str.match(/^0\.0*/);
+  const leadingZeros = match ? match[0].length - 2 : 0;
+  // Show at least 4 significant digits
+  const digits = Math.max(leadingZeros + 4, 8);
+  return price.toFixed(Math.min(digits, 18));
+}
+
+/**
  * Get the collateral tier name from a SOL amount.
  */
 export function getCollateralTier(amount: number): string {
-  if (amount >= 25) return "Diamond";
-  if (amount >= 10) return "Gold";
-  if (amount >= 5) return "Silver";
-  return "Bronze";
+  if (amount >= 10) return "Diamond";
+  if (amount >= 5) return "Platinum";
+  if (amount >= 3) return "Gold";
+  if (amount >= 1) return "Silver";
+  if (amount >= 0.5) return "Bronze";
+  return "Iron";
 }

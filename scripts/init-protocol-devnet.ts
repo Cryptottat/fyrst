@@ -35,8 +35,8 @@ async function main() {
     PROGRAM_ID,
   );
 
-  // Use deployer wallet as treasury for now (can be updated later)
-  const treasury = keypair.publicKey;
+  // Platform fee treasury wallet
+  const treasury = new PublicKey("6m2hSPkqWoG3eFYjWJApDK1p33kqemHD92BC8219QeNN");
 
   console.log("Program ID:", PROGRAM_ID.toBase58());
   console.log("Authority:", keypair.publicKey.toBase58());

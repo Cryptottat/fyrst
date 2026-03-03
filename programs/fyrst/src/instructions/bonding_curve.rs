@@ -76,6 +76,20 @@ fn build_create_metadata_v3_ix(
     }
 }
 
+/// Integer square root via Babylonian method (Newton's method)
+fn isqrt(n: u128) -> u128 {
+    if n == 0 {
+        return 0;
+    }
+    let mut x = n;
+    let mut y = (x + 1) / 2;
+    while y < x {
+        x = y;
+        y = (x + n / x) / 2;
+    }
+    x
+}
+
 /// Initialize bonding curve for a token with SPL mint + metadata
 pub fn init_bonding_curve(
     ctx: Context<InitBondingCurve>,
@@ -134,6 +148,9 @@ pub fn init_bonding_curve(
     curve.graduated = false;
     curve.deployer = ctx.accounts.deployer.key();
     curve.total_sol_collected = 0;
+    curve.max_reserve_reached = 0;
+    curve.total_deployer_fees = 0;
+    curve.claimed_deployer_fees = 0;
     curve.bump = ctx.bumps.bonding_curve;
 
     msg!(
@@ -147,11 +164,12 @@ pub fn init_bonding_curve(
 }
 
 /// Buy tokens on the bonding curve — mints real SPL tokens
-pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
-    let current_price;
+/// Uses integral (area-under-curve) pricing to ensure reserve solvency.
+pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64) -> Result<()> {
     let tokens;
     let net_sol;
     let protocol_fee;
+    let trade_fee;
     let token_mint_key;
     let curve_bump;
     {
@@ -160,18 +178,7 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
         require!(!curve.graduated, FyrstError::AlreadyGraduated);
         require!(sol_amount > 0, FyrstError::InsufficientFunds);
 
-        // Normalize supply to whole-token units so slope applies per whole token
-        let supply_units = curve.current_supply / 10u64.pow(TOKEN_DECIMALS as u32);
-        current_price = curve
-            .base_price
-            .checked_add(
-                curve.slope.checked_mul(supply_units).ok_or(FyrstError::MathOverflow)?,
-            )
-            .ok_or(FyrstError::MathOverflow)?;
-
-        require!(current_price > 0, FyrstError::InvalidPrice);
-
-        let trade_fee = sol_amount
+        trade_fee = sol_amount
             .checked_mul(TRADE_FEE_BPS)
             .ok_or(FyrstError::MathOverflow)?
             .checked_div(BPS_DENOMINATOR)
@@ -189,11 +196,33 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
             .checked_sub(protocol_fee)
             .ok_or(FyrstError::MathOverflow)?;
 
-        tokens = (net_sol as u128)
-            .checked_mul(10u128.pow(TOKEN_DECIMALS as u32))
-            .ok_or(FyrstError::MathOverflow)?
-            .checked_div(current_price as u128)
-            .ok_or(FyrstError::MathOverflow)? as u64;
+        // Integral pricing (area under the linear bonding curve):
+        // Price curve: P(S) = base_price + slope * (S / D)
+        // Cost to buy T atomic tokens from supply S:
+        //   cost = base_price*T/D + slope*T*(2S+T) / (2*D^2)
+        // Rearranged as quadratic in T:
+        //   slope*T^2 + 2*(base_price*D + slope*S)*T - 2*net_sol*D^2 = 0
+        let d = 10u64.pow(TOKEN_DECIMALS as u32);
+        let s = curve.current_supply as u128;
+        let d128 = d as u128;
+        let bp = curve.base_price as u128;
+        let sl = curve.slope as u128;
+        let net128 = net_sol as u128;
+
+        tokens = if curve.slope == 0 {
+            // Flat pricing: tokens = net_sol * D / base_price
+            require!(curve.base_price > 0, FyrstError::InvalidPrice);
+            (net128 * d128 / bp) as u64
+        } else {
+            let b = 2 * (bp * d128 + sl * s);
+            let c_val = 2 * net128 * d128 * d128;
+            let disc = b * b + 4 * sl * c_val;
+            let sqrt_disc = isqrt(disc);
+            ((sqrt_disc - b) / (2 * sl)) as u64
+        };
+
+        require!(tokens > 0, FyrstError::InsufficientFunds);
+        require!(tokens >= min_tokens_out, FyrstError::SlippageExceeded);
 
         token_mint_key = curve.token_mint;
         curve_bump = curve.bump;
@@ -246,6 +275,16 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
         tokens,
     )?;
 
+    // Transfer remaining trade fee share to treasury (from curve PDA) — before mutable borrow
+    let deployer_share = trade_fee / 2;
+    let treasury_trade_share = trade_fee.checked_sub(deployer_share).ok_or(FyrstError::MathOverflow)?;
+    if treasury_trade_share > 0 {
+        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= treasury_trade_share;
+        **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += treasury_trade_share;
+    }
+
+    let graduation_threshold = ctx.accounts.protocol_config.graduation_threshold;
+
     // Update curve state
     let curve = &mut ctx.accounts.bonding_curve;
     curve.current_supply = curve
@@ -260,10 +299,19 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
         .total_sol_collected
         .checked_add(net_sol)
         .ok_or(FyrstError::MathOverflow)?;
+    curve.total_deployer_fees = curve
+        .total_deployer_fees
+        .checked_add(deployer_share)
+        .ok_or(FyrstError::MathOverflow)?;
+
+    // Update max_reserve_reached (capped at GRADUATION_THRESHOLD)
+    let capped_reserve = curve.reserve_balance.min(graduation_threshold);
+    if capped_reserve > curve.max_reserve_reached {
+        curve.max_reserve_reached = capped_reserve;
+    }
 
     // Auto-graduation check
-    let config = &ctx.accounts.protocol_config;
-    if curve.reserve_balance >= config.graduation_threshold {
+    if curve.reserve_balance >= graduation_threshold {
         curve.graduated = true;
         msg!("Token auto-graduated: mint={}", curve.token_mint);
     }
@@ -280,8 +328,11 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64) -> Result<()> {
 }
 
 /// Sell tokens on the bonding curve — burns SPL tokens
-pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64) -> Result<()> {
-    let net_sol;
+/// Uses integral pricing to ensure reserve solvency.
+pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64) -> Result<()> {
+    let mut net_sol;
+    let trade_fee_sell;
+    let protocol_fee_sell;
     {
         let curve = &ctx.accounts.bonding_curve;
 
@@ -292,33 +343,43 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64) -> Result<()> {
             FyrstError::InsufficientTokens
         );
 
-        // Normalize supply to whole-token units so slope applies per whole token
-        let supply_units = curve.current_supply / 10u64.pow(TOKEN_DECIMALS as u32);
-        let current_price = curve
-            .base_price
-            .checked_add(
-                curve.slope.checked_mul(supply_units).ok_or(FyrstError::MathOverflow)?,
-            )
-            .ok_or(FyrstError::MathOverflow)?;
+        // Integral pricing (area under the curve for sell):
+        // Revenue = base_price*T/D + slope*T*(2S-T) / (2*D^2)
+        // where T = token_amount (atomic), S = current_supply (atomic), D = 10^decimals
+        let d = 10u64.pow(TOKEN_DECIMALS as u32);
+        let t = token_amount as u128;
+        let s = curve.current_supply as u128;
+        let d128 = d as u128;
+        let bp = curve.base_price as u128;
+        let sl = curve.slope as u128;
 
-        let gross_sol = (token_amount as u128)
-            .checked_mul(current_price as u128)
-            .ok_or(FyrstError::MathOverflow)?
-            .checked_div(10u128.pow(TOKEN_DECIMALS as u32))
-            .ok_or(FyrstError::MathOverflow)? as u64;
+        let gross_sol = (bp * t / d128
+            + sl * t * (2 * s - t) / (2 * d128 * d128)) as u64;
 
-        let fee = gross_sol
+        trade_fee_sell = gross_sol
             .checked_mul(TRADE_FEE_BPS)
             .ok_or(FyrstError::MathOverflow)?
             .checked_div(BPS_DENOMINATOR)
             .ok_or(FyrstError::MathOverflow)?;
 
-        net_sol = gross_sol.checked_sub(fee).ok_or(FyrstError::MathOverflow)?;
+        protocol_fee_sell = gross_sol
+            .checked_mul(PROTOCOL_FEE_BPS)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(BPS_DENOMINATOR)
+            .ok_or(FyrstError::MathOverflow)?;
 
-        require!(
-            curve.reserve_balance >= net_sol,
-            FyrstError::InsufficientFunds
-        );
+        net_sol = gross_sol
+            .checked_sub(trade_fee_sell)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_sub(protocol_fee_sell)
+            .ok_or(FyrstError::MathOverflow)?;
+
+        // Cap at reserve balance to handle integer rounding when selling 100%
+        if net_sol > curve.reserve_balance {
+            net_sol = curve.reserve_balance;
+        }
+
+        require!(net_sol >= min_sol_out, FyrstError::SlippageExceeded);
     }
 
     // Burn SPL tokens from seller's ATA
@@ -338,6 +399,17 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64) -> Result<()> {
     **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= net_sol;
     **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += net_sol;
 
+    // Transfer trade fee share + protocol fee to treasury (from curve PDA) — before mutable borrow
+    let deployer_share = trade_fee_sell / 2;
+    let treasury_trade_share = trade_fee_sell.checked_sub(deployer_share).ok_or(FyrstError::MathOverflow)?;
+    let total_treasury_sell = treasury_trade_share
+        .checked_add(protocol_fee_sell)
+        .ok_or(FyrstError::MathOverflow)?;
+    if total_treasury_sell > 0 {
+        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= total_treasury_sell;
+        **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += total_treasury_sell;
+    }
+
     // Update curve state — total_sol_collected does NOT decrease
     let curve = &mut ctx.accounts.bonding_curve;
     curve.current_supply = curve
@@ -347,6 +419,10 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64) -> Result<()> {
     curve.reserve_balance = curve
         .reserve_balance
         .checked_sub(net_sol)
+        .ok_or(FyrstError::MathOverflow)?;
+    curve.total_deployer_fees = curve
+        .total_deployer_fees
+        .checked_add(deployer_share)
         .ok_or(FyrstError::MathOverflow)?;
 
     msg!(
@@ -463,6 +539,19 @@ pub struct SellTokens<'info> {
         associated_token::authority = seller,
     )]
     pub seller_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        seeds = [PROTOCOL_SEED],
+        bump = protocol_config.bump,
+    )]
+    pub protocol_config: Account<'info, ProtocolConfig>,
+
+    /// CHECK: Treasury wallet from protocol config
+    #[account(
+        mut,
+        address = protocol_config.treasury @ FyrstError::Unauthorized,
+    )]
+    pub treasury: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

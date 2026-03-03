@@ -16,7 +16,9 @@ export interface ApiToken {
   marketCap: number;
   currentPrice: number;
   totalSupply: number;
+  collateralAmount: number;
   collateralTier: string;
+  deadlineTimestamp: string | null;
   graduated: boolean;
   bondingCurveProgress: number;
   createdAt: string;
@@ -129,6 +131,7 @@ export async function createLaunch(data: {
   imageUrl: string;
   deployerAddress: string;
   collateralAmount: number;
+  durationSeconds: number;
   escrowTxSignature?: string;
   curveTxSignature?: string;
 }): Promise<ApiToken> {
@@ -206,6 +209,35 @@ export async function fetchPortfolio(wallet: string): Promise<ApiPortfolio> {
   } catch {
     return { ownerAddress: wallet, holdings: [], totalValueSol: 0 };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Comments
+// ---------------------------------------------------------------------------
+
+export interface ApiComment {
+  id: string;
+  tokenMint: string;
+  walletAddress: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function fetchComments(mint: string): Promise<ApiComment[]> {
+  try {
+    return await apiFetch<ApiComment[]>(`/api/comments/${mint}`);
+  } catch {
+    return [];
+  }
+}
+
+export async function postComment(data: {
+  tokenMint: string;
+  walletAddress: string;
+  content: string;
+  signature: string;
+}): Promise<ApiComment> {
+  return apiPost<ApiComment>("/api/comments", data);
 }
 
 // ---------------------------------------------------------------------------

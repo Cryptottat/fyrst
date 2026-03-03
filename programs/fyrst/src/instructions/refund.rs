@@ -1,135 +1,76 @@
 use anchor_lang::prelude::*;
-use crate::state::{BuyerRecord, EscrowVault, BondingCurve, ProtocolConfig};
+use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount};
+use crate::state::{EscrowVault, BondingCurve};
 use crate::errors::FyrstError;
 use crate::constants::*;
 
-/// Record a buyer's purchase for refund eligibility
-pub fn record_buyer(ctx: Context<RecordBuyer>, amount: u64, price: u64) -> Result<()> {
-    let record = &mut ctx.accounts.buyer_record;
-
-    if record.total_bought == 0 {
-        // First purchase
-        record.buyer = ctx.accounts.buyer.key();
-        record.token_mint = ctx.accounts.token_mint.key();
-        record.first_buy_at = Clock::get()?.unix_timestamp;
-        record.refund_claimed = false;
-        record.bump = ctx.bumps.buyer_record;
-    }
-
-    // Update totals
-    let sol_spent = (amount as u128)
-        .checked_mul(price as u128)
-        .ok_or(FyrstError::MathOverflow)?
-        .checked_div(10u128.pow(TOKEN_DECIMALS as u32))
-        .ok_or(FyrstError::MathOverflow)? as u64;
-
-    record.total_bought = record
-        .total_bought
-        .checked_add(amount)
-        .ok_or(FyrstError::MathOverflow)?;
-
-    record.total_sol_spent = record
-        .total_sol_spent
-        .checked_add(sol_spent)
-        .ok_or(FyrstError::MathOverflow)?;
-
-    // Recalculate average price
-    if record.total_bought > 0 {
-        record.avg_price = (record.total_sol_spent as u128)
-            .checked_mul(10u128.pow(TOKEN_DECIMALS as u32))
-            .ok_or(FyrstError::MathOverflow)?
-            .checked_div(record.total_bought as u128)
-            .ok_or(FyrstError::MathOverflow)? as u64;
-    }
-
-    msg!(
-        "Buyer recorded: buyer={}, mint={}, amount={}, total={}",
-        record.buyer,
-        record.token_mint,
-        amount,
-        record.total_bought
-    );
-
-    Ok(())
-}
-
-/// Process pro-rata refund for a buyer from escrow (called by protocol authority)
+/// Process burn-to-refund: buyer burns their SPL tokens and receives
+/// a pro-rata share of the escrow lamports.
+///
+/// refund = (buyer_tokens / current_supply) × escrow_remaining_lamports
+///
+/// Conditions: token NOT graduated AND deadline passed AND buyer holds tokens.
 pub fn process_refund(ctx: Context<ProcessRefund>) -> Result<()> {
     let escrow = &ctx.accounts.escrow_vault;
-    let record = &mut ctx.accounts.buyer_record;
-    let curve = &ctx.accounts.bonding_curve;
+    let curve = &mut ctx.accounts.bonding_curve;
+    let buyer_balance = ctx.accounts.buyer_token_account.amount;
 
-    require!(!record.refund_claimed, FyrstError::RefundAlreadyProcessed);
-    require!(escrow.rugged, FyrstError::SafePeriodExpired);
+    // Must not be graduated AND deadline must have passed
+    let now = Clock::get()?.unix_timestamp;
+    require!(
+        !curve.graduated && now >= escrow.deadline_timestamp,
+        FyrstError::DeadlineNotReached
+    );
+    require!(buyer_balance > 0, FyrstError::InsufficientTokens);
 
-    // Pro-rata refund: refund = (buyer_sol_spent * escrow_collateral) / total_sol_collected
-    // Use u128 intermediate to avoid overflow
-    let refund_amount = if curve.total_sol_collected > 0 {
-        (record.total_sol_spent as u128)
-            .checked_mul(escrow.collateral_amount as u128)
-            .ok_or(FyrstError::MathOverflow)?
-            .checked_div(curve.total_sol_collected as u128)
-            .ok_or(FyrstError::MathOverflow)? as u64
-    } else {
-        // No SOL ever collected — refund full amount up to collateral
-        record.total_sol_spent.min(escrow.collateral_amount)
-    };
+    // refund = (buyer_tokens / current_supply) × escrow remaining lamports
+    let escrow_lamports = ctx.accounts.escrow_vault.to_account_info().lamports();
+    let refund_amount = (buyer_balance as u128)
+        .checked_mul(escrow_lamports as u128)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_div(curve.current_supply as u128)
+        .ok_or(FyrstError::MathOverflow)? as u64;
 
-    require!(refund_amount > 0, FyrstError::NoBuyerRecord);
+    require!(refund_amount > 0, FyrstError::InsufficientFunds);
+
+    // Burn buyer's SPL tokens
+    token::burn(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Burn {
+                mint: ctx.accounts.token_mint.to_account_info(),
+                from: ctx.accounts.buyer_token_account.to_account_info(),
+                authority: ctx.accounts.buyer.to_account_info(),
+            },
+        ),
+        buyer_balance,
+    )?;
 
     // Transfer SOL from escrow to buyer
     **ctx.accounts.escrow_vault.to_account_info().try_borrow_mut_lamports()? -= refund_amount;
     **ctx.accounts.buyer.to_account_info().try_borrow_mut_lamports()? += refund_amount;
 
-    record.refund_claimed = true;
+    // Update bonding curve supply (so next refund has correct ratio)
+    curve.current_supply = curve
+        .current_supply
+        .checked_sub(buyer_balance)
+        .ok_or(FyrstError::MathOverflow)?;
 
     msg!(
-        "Refund processed: buyer={}, amount={}, mint={}",
-        record.buyer,
-        refund_amount,
-        record.token_mint
+        "Refund: buyer={}, tokens_burned={}, sol_refunded={}",
+        ctx.accounts.buyer.key(),
+        buyer_balance,
+        refund_amount
     );
 
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct RecordBuyer<'info> {
+pub struct ProcessRefund<'info> {
+    /// Buyer claiming their own refund (permissionless)
     #[account(mut)]
     pub buyer: Signer<'info>,
-
-    /// CHECK: Token mint account
-    pub token_mint: UncheckedAccount<'info>,
-
-    #[account(
-        init_if_needed,
-        payer = buyer,
-        space = BuyerRecord::LEN,
-        seeds = [BUYER_SEED, buyer.key().as_ref(), token_mint.key().as_ref()],
-        bump,
-    )]
-    pub buyer_record: Account<'info, BuyerRecord>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct ProcessRefund<'info> {
-    /// Protocol authority that triggers refunds
-    #[account(
-        constraint = authority.key() == protocol_config.authority @ FyrstError::Unauthorized
-    )]
-    pub authority: Signer<'info>,
-
-    /// CHECK: Buyer receiving the refund
-    #[account(mut)]
-    pub buyer: UncheckedAccount<'info>,
-
-    #[account(
-        seeds = [PROTOCOL_SEED],
-        bump = protocol_config.bump,
-    )]
-    pub protocol_config: Account<'info, ProtocolConfig>,
 
     #[account(
         mut,
@@ -139,18 +80,22 @@ pub struct ProcessRefund<'info> {
     pub escrow_vault: Account<'info, EscrowVault>,
 
     #[account(
+        mut,
         seeds = [CURVE_SEED, escrow_vault.token_mint.as_ref()],
         bump = bonding_curve.bump,
     )]
     pub bonding_curve: Account<'info, BondingCurve>,
 
+    #[account(mut, address = bonding_curve.token_mint)]
+    pub token_mint: Account<'info, Mint>,
+
     #[account(
         mut,
-        seeds = [BUYER_SEED, buyer.key().as_ref(), escrow_vault.token_mint.as_ref()],
-        bump = buyer_record.bump,
-        has_one = buyer,
+        associated_token::mint = token_mint,
+        associated_token::authority = buyer,
     )]
-    pub buyer_record: Account<'info, BuyerRecord>,
+    pub buyer_token_account: Account<'info, TokenAccount>,
 
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }

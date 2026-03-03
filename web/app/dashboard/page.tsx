@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { fetchLaunches, type ApiToken } from "@/lib/api";
@@ -14,104 +13,111 @@ import {
 } from "@/lib/utils";
 import { Search } from "lucide-react";
 
-type SortKey = "newest" | "marketCap" | "reputation";
+type SortKey = "lastTrade" | "newest" | "marketCap" | "reputation";
 
-function PriceFlash({ snapshot, fallbackMcap }: { snapshot: PriceSnapshot | undefined; fallbackMcap: number }) {
-  const mcap = snapshot?.marketCap ?? fallbackMcap;
+function TokenCard({ token, index, flash }: { token: ApiToken; index: number; flash: boolean }) {
+  const score = token.deployer?.reputationScore ?? 50;
+  const grade = getReputationGrade(score);
+  const tier = token.collateralTier || "Bronze";
+  const snapshot: PriceSnapshot | undefined = useAppStore((s) => s.prices.get(token.mint));
+  const solPrice = useAppStore((s) => s.solPrice);
+  const liveMcapSol = snapshot?.marketCap ?? token.marketCap;
+  const liveMcap = solPrice > 0 ? liveMcapSol * solPrice : liveMcapSol;
+  const liveProgress = snapshot?.bondingCurveProgress ?? token.bondingCurveProgress;
+
   const changePercent =
     snapshot && snapshot.previousPrice > 0
       ? ((snapshot.price - snapshot.previousPrice) / snapshot.previousPrice) * 100
       : 0;
-
   const isRecent = snapshot ? Date.now() - snapshot.updatedAt < 2000 : false;
   const isUp = changePercent > 0;
   const isDown = changePercent < 0;
 
   return (
-    <div className="text-right shrink-0 w-28">
-      <p
-        className={`text-sm font-score neon-text-subtle transition-colors duration-500 ${
-          isRecent && isUp
-            ? "text-success"
-            : isRecent && isDown
-              ? "text-error"
-              : "text-text-primary"
+    <Link href={`/token/${token.mint}`}>
+      <div
+        className={`arcade-border bg-bg-card p-4 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(167,139,250,0.2)] transition-all h-full ${
+          flash ? "animate-card-flash" : ""
         }`}
       >
-        ${formatCompact(mcap)}
-      </p>
-      {changePercent !== 0 && (
-        <p
-          className={`text-[9px] font-mono ${
-            isUp ? "text-success" : "text-error"
-          }`}
-        >
-          {isUp ? "+" : ""}
-          {changePercent.toFixed(2)}%
-        </p>
-      )}
-    </div>
-  );
-}
-
-function TokenRow({ token, index }: { token: ApiToken; index: number }) {
-  const score = token.deployer?.reputationScore ?? 50;
-  const grade = getReputationGrade(score);
-  const tier = token.collateralTier || "Bronze";
-  const snapshot = useAppStore((s) => s.prices.get(token.mint));
-  const liveProgress = snapshot?.bondingCurveProgress ?? token.bondingCurveProgress;
-
-  return (
-    <Link href={`/token/${token.mint}`}>
-      <Card hover className="flex flex-col sm:flex-row sm:items-center gap-4 relative group">
         {/* P1 cursor on hover */}
-        <div className="absolute -left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="text-[8px] font-display text-primary animate-p1 neon-text">P1</span>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <span className="text-[8px] font-display text-text-muted">
-              #{String(index + 1).padStart(2, "0")}
-            </span>
-            <h3 className="text-[10px] font-display text-text-primary truncate leading-relaxed">
+        {/* Slot number */}
+        <div className="absolute top-2 right-3">
+          <span className="text-[8px] font-display text-text-muted">
+            #{String(index + 1).padStart(2, "0")}
+          </span>
+        </div>
+
+        {/* Image + Name */}
+        <div className="flex items-start gap-3 mb-3 mt-1">
+          {token.imageUrl && (
+            <img
+              src={token.imageUrl}
+              alt={token.name}
+              className="w-12 h-12 object-cover arcade-border flex-shrink-0"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[10px] font-display text-text-primary leading-relaxed truncate">
               {token.name}
             </h3>
-            <span className="text-xs font-mono text-text-muted">
+            <p className="text-xs font-mono text-text-muted mt-0.5">
               ${token.symbol}
-            </span>
+            </p>
+            <div className="flex gap-1.5 mt-1.5">
+              <Badge label={grade} variant="reputation" />
+              <Badge label={tier} variant="collateral" />
+            </div>
           </div>
-          <p className="text-[10px] text-text-muted truncate">
-            {token.description}
-          </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Badge label={grade} variant="reputation" />
-          <Badge label={tier} variant="collateral" />
-        </div>
+        <ProgressBar value={liveProgress} className="mb-3" />
 
-        <div className="w-28 shrink-0">
-          <ProgressBar value={liveProgress} />
-        </div>
-
-        <PriceFlash snapshot={snapshot} fallbackMcap={token.marketCap} />
-
-        <div className="text-right shrink-0 w-16">
-          <p className="text-[9px] text-text-muted font-mono">
+        <div className="flex items-center justify-between text-xs">
+          <div>
+            <span className="text-text-muted font-display text-[8px]">MCap </span>
+            <span
+              className={`font-score text-sm neon-text-subtle transition-colors duration-500 ${
+                isRecent && isUp
+                  ? "text-success"
+                  : isRecent && isDown
+                    ? "text-error"
+                    : "text-text-secondary"
+              }`}
+            >
+              ${formatCompact(liveMcap)}
+            </span>
+            {changePercent !== 0 && (
+              <span
+                className={`ml-1 text-[9px] font-mono ${
+                  isUp ? "text-success" : "text-error"
+                }`}
+              >
+                {isUp ? "+" : ""}{changePercent.toFixed(1)}%
+              </span>
+            )}
+          </div>
+          <span className="text-[9px] text-text-muted font-mono">
             {formatTimeAgo(token.createdAt)}
-          </p>
+          </span>
         </div>
-      </Card>
+      </div>
     </Link>
   );
 }
 
 export default function DashboardPage() {
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortKey>("newest");
+  const [sort, setSort] = useState<SortKey>("lastTrade");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [flashMint, setFlashMint] = useState<string | null>(null);
+  const prevFirstRef = useRef<string | null>(null);
 
   const tokens = useAppStore((s) => s.tokens);
   const setTokens = useAppStore((s) => s.setTokens);
@@ -121,7 +127,12 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
 
-    fetchLaunches(sort === "marketCap" ? "marketcap" : sort, 50, 0)
+    const apiSort =
+      sort === "marketCap" ? "marketcap" :
+      sort === "lastTrade" ? "lastTrade" :
+      sort;
+
+    fetchLaunches(apiSort, 50, 0)
       .then((result) => {
         if (!cancelled) {
           setTokens(result.tokens);
@@ -148,9 +159,21 @@ export default function DashboardPage() {
     );
   }, [search, tokens]);
 
+  // Flash effect when the first card changes (LAST TRADE sort)
+  useEffect(() => {
+    if (sort !== "lastTrade" || filtered.length === 0) return;
+    const firstMint = filtered[0].mint;
+    if (prevFirstRef.current && prevFirstRef.current !== firstMint) {
+      setFlashMint(firstMint);
+      const timer = setTimeout(() => setFlashMint(null), 1500);
+      return () => clearTimeout(timer);
+    }
+    prevFirstRef.current = firstMint;
+  }, [filtered, sort]);
+
   return (
     <main className="min-h-screen pt-20 pb-16 px-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="text-xs md:text-sm font-display text-text-primary mb-3 leading-relaxed">
             PLAYER SELECT
@@ -177,6 +200,7 @@ export default function DashboardPage() {
           <div className="flex gap-2">
             {(
               [
+                { key: "lastTrade", label: "LAST TRADE" },
                 { key: "newest", label: "NEW" },
                 { key: "marketCap", label: "MCAP" },
                 { key: "reputation", label: "REP" },
@@ -197,31 +221,36 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Token list */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-              <p className="text-[10px] font-display animate-blink">LOADING...</p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-16">
-              <p className="text-xs font-display text-error neon-text-subtle mb-2">CONNECTION ERROR</p>
-              <p className="text-xs text-text-muted font-mono">{error}</p>
-            </div>
-          ) : filtered.length > 0 ? (
-            filtered.map((token, i) => (
-              <TokenRow key={token.mint} token={token} index={i} />
-            ))
-          ) : (
-            <div className="text-center py-16">
-              <p className="text-[10px] font-display text-text-muted">
-                {search.trim()
-                  ? "NO MATCH FOUND."
-                  : "NO PLAYERS YET. BE THE FIRST!"}
-              </p>
-            </div>
-          )}
-        </div>
+        {/* Token card grid */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 text-text-muted">
+            <p className="text-[10px] font-display animate-blink">LOADING...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-16">
+            <p className="text-xs font-display text-error neon-text-subtle mb-2">CONNECTION ERROR</p>
+            <p className="text-xs text-text-muted font-mono">{error}</p>
+          </div>
+        ) : filtered.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filtered.map((token, i) => (
+              <TokenCard
+                key={token.mint}
+                token={token}
+                index={i}
+                flash={flashMint === token.mint}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <p className="text-[10px] font-display text-text-muted">
+              {search.trim()
+                ? "NO MATCH FOUND."
+                : "NO PLAYERS YET. BE THE FIRST!"}
+            </p>
+          </div>
+        )}
       </div>
     </main>
   );

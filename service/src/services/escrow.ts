@@ -6,13 +6,15 @@ import { prisma, dbConnected } from "../lib/prisma";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MINIMUM_COLLATERAL_SOL = 0.01;
+const MINIMUM_COLLATERAL_SOL = 0.1;
 
 const TIER_THRESHOLDS: { min: number; tier: CollateralTier }[] = [
-  { min: 25, tier: CollateralTier.Diamond },
-  { min: 10, tier: CollateralTier.Gold },
-  { min: 5, tier: CollateralTier.Silver },
-  { min: 0.01, tier: CollateralTier.Bronze },
+  { min: 10, tier: CollateralTier.Diamond },
+  { min: 5, tier: CollateralTier.Platinum },
+  { min: 3, tier: CollateralTier.Gold },
+  { min: 1, tier: CollateralTier.Silver },
+  { min: 0.5, tier: CollateralTier.Bronze },
+  { min: 0.1, tier: CollateralTier.Iron },
 ];
 
 // ---------------------------------------------------------------------------
@@ -26,7 +28,7 @@ export function assignTier(amountSol: number): CollateralTier {
   for (const { min, tier } of TIER_THRESHOLDS) {
     if (amountSol >= min) return tier;
   }
-  return CollateralTier.Bronze;
+  return CollateralTier.Iron;
 }
 
 /**
