@@ -13,7 +13,7 @@ import {
 } from "@/lib/utils";
 import { Search } from "lucide-react";
 
-type SortKey = "lastTrade" | "newest" | "marketCap" | "reputation";
+type SortKey = "lastTrade" | "newest" | "marketCap" | "reputation" | "pressure" | "deadline" | "collateral";
 
 function TokenCard({ token, index, flash }: { token: ApiToken; index: number; flash: boolean }) {
   const score = token.deployer?.reputationScore ?? 50;
@@ -127,7 +127,9 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
 
-    const apiSort =
+    // Client-side sorts don't need server ordering
+    const clientSideSorts = ["pressure", "deadline", "collateral"];
+    const apiSort = clientSideSorts.includes(sort) ? "newest" :
       sort === "marketCap" ? "marketcap" :
       sort === "lastTrade" ? "lastTrade" :
       sort;
@@ -149,15 +151,46 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [sort, setTokens]);
 
+  // Tick every second for pressure/deadline sorts
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (sort !== "pressure" && sort !== "deadline") return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [sort]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return tokens;
-    const q = search.toLowerCase();
-    return tokens.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.symbol.toLowerCase().includes(q),
-    );
-  }, [search, tokens]);
+    let list = tokens;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          t.symbol.toLowerCase().includes(q),
+      );
+    }
+
+    // Client-side sorts for pressure / deadline / collateral
+    if (sort === "pressure") {
+      list = [...list].sort((a, b) => {
+        const remA = Math.max((new Date(a.deadlineTimestamp || 0).getTime() - now) / 1000, 1);
+        const remB = Math.max((new Date(b.deadlineTimestamp || 0).getTime() - now) / 1000, 1);
+        const pA = a.graduated ? -1 : (a.collateralAmount / remA) * 100;
+        const pB = b.graduated ? -1 : (b.collateralAmount / remB) * 100;
+        return pB - pA;
+      });
+    } else if (sort === "deadline") {
+      list = [...list].sort((a, b) => {
+        const remA = a.deadlineTimestamp ? new Date(a.deadlineTimestamp).getTime() - now : Infinity;
+        const remB = b.deadlineTimestamp ? new Date(b.deadlineTimestamp).getTime() - now : Infinity;
+        return remA - remB; // most urgent first
+      });
+    } else if (sort === "collateral") {
+      list = [...list].sort((a, b) => b.collateralAmount - a.collateralAmount);
+    }
+
+    return list;
+  }, [search, tokens, sort, now]);
 
   // Flash effect when the first card changes (LAST TRADE sort)
   useEffect(() => {
@@ -197,13 +230,16 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {(
               [
                 { key: "lastTrade", label: "LAST TRADE" },
                 { key: "newest", label: "NEW" },
                 { key: "marketCap", label: "MCAP" },
                 { key: "reputation", label: "REP" },
+                { key: "pressure", label: "PRESSURE" },
+                { key: "deadline", label: "DEADLINE" },
+                { key: "collateral", label: "ESCROW" },
               ] as const
             ).map((option) => (
               <button
