@@ -654,11 +654,7 @@
         },
         {
           "name": "creator_lp_token",
-          "docs": [
-            "LP token account for curve PDA (receives LP, then burned)"
-          ],
-          "writable": true,
-          "signer": true
+          "writable": true
         },
         {
           "name": "observation_state",

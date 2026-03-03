@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{self, program::invoke_signed, program::invoke};
-use anchor_spl::token::{self, Mint, Token, TokenAccount, MintTo, Burn, SetAuthority};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, MintTo, SetAuthority};
 use anchor_spl::associated_token::AssociatedToken;
 use crate::state::BondingCurve;
 use crate::errors::FyrstError;
@@ -68,7 +68,6 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
     )?;
 
     // 4. Transfer reserve SOL from curve PDA to WSOL ATA, then sync_native
-    // Transfer lamports directly from curve PDA
     **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= reserve_sol;
     **ctx.accounts.curve_wsol_account.to_account_info().try_borrow_mut_lamports()? += reserve_sol;
 
@@ -147,7 +146,7 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
             solana_program::instruction::AccountMeta::new(creator_token_0.key(), false),
             // 10. creator_token_1 (mut)
             solana_program::instruction::AccountMeta::new(creator_token_1.key(), false),
-            // 11. creator_lp_token (mut)
+            // 11. creator_lp_token (mut) — Raydium creates this ATA
             solana_program::instruction::AccountMeta::new(ctx.accounts.creator_lp_token.key(), false),
             // 12. lp_mint (mut)
             solana_program::instruction::AccountMeta::new(ctx.accounts.lp_mint.key(), false),
@@ -191,24 +190,35 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
     )?;
 
     // 6. Burn all LP tokens (permanent liquidity lock — pump.fun pattern)
-    let lp_balance = ctx.accounts.creator_lp_token.amount;
-    if lp_balance > 0 {
-        // Reload after CPI to get updated amount
-        ctx.accounts.creator_lp_token.reload()?;
-        let burn_amount = ctx.accounts.creator_lp_token.amount;
-        if burn_amount > 0 {
-            token::burn(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Burn {
-                        mint: ctx.accounts.lp_mint.to_account_info(),
-                        from: ctx.accounts.creator_lp_token.to_account_info(),
-                        authority: ctx.accounts.bonding_curve.to_account_info(),
-                    },
+    // creator_lp_token is UncheckedAccount — Raydium created it during CPI.
+    // Read the token account data manually to get LP balance.
+    {
+        let lp_data = ctx.accounts.creator_lp_token.try_borrow_data()?;
+        // SPL token account layout: mint(32) + owner(32) + amount(u64 at offset 64)
+        if lp_data.len() >= 72 {
+            let amount_bytes: [u8; 8] = lp_data[64..72].try_into().unwrap();
+            let lp_amount = u64::from_le_bytes(amount_bytes);
+            drop(lp_data); // release borrow before CPI
+
+            if lp_amount > 0 {
+                let burn_ix = anchor_spl::token::spl_token::instruction::burn(
+                    &anchor_spl::token::ID,
+                    &ctx.accounts.creator_lp_token.key(),
+                    &ctx.accounts.lp_mint.key(),
+                    &ctx.accounts.bonding_curve.key(),
+                    &[],
+                    lp_amount,
+                )?;
+                invoke_signed(
+                    &burn_ix,
+                    &[
+                        ctx.accounts.creator_lp_token.to_account_info(),
+                        ctx.accounts.lp_mint.to_account_info(),
+                        ctx.accounts.bonding_curve.to_account_info(),
+                    ],
                     signer_seeds,
-                ),
-                burn_amount,
-            )?;
+                )?;
+            }
         }
     }
 
@@ -319,14 +329,9 @@ pub struct GraduateToDex<'info> {
     #[account(mut)]
     pub lp_mint: UncheckedAccount<'info>,
 
-    /// LP token account for curve PDA (receives LP, then burned)
-    #[account(
-        init_if_needed,
-        payer = payer,
-        token::mint = lp_mint,
-        token::authority = bonding_curve,
-    )]
-    pub creator_lp_token: Account<'info, TokenAccount>,
+    /// CHECK: LP token account for curve PDA — created by Raydium CPI, then burned
+    #[account(mut)]
+    pub creator_lp_token: UncheckedAccount<'info>,
 
     /// CHECK: Observation state account (created by Raydium CPI)
     #[account(mut)]
