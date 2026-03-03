@@ -7,7 +7,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
 import BondingCurveChart from "@/components/charts/BondingCurveChart";
-import { fetchToken, fetchDeployer, fetchTrades, recordTrade, fetchComments, postComment, type ApiToken, type ApiDeployer, type ApiComment } from "@/lib/api";
+import { fetchToken, fetchDeployer, fetchTrades, fetchComments, postComment, type ApiToken, type ApiDeployer, type ApiComment } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { useTokenSubscription } from "@/hooks/useSocket";
 import {
@@ -261,35 +261,16 @@ export default function TokenDetailPage({
       const lamports = new BN(Math.floor(solAmount * 1e9));
       const mintPubkey = new PublicKey(mint);
 
-      const txSig = await buyTokens(program, publicKey, mintPubkey, lamports, slippageBps);
+      await buyTokens(program, publicKey, mintPubkey, lamports, slippageBps);
 
-      // On-chain succeeded — clear input immediately
+      // On-chain succeeded — clear input, refresh data
+      // Trade recording handled by onchainListener (no duplicate POST)
       setBuyAmount("");
-
-      // Refresh on-chain data to get post-buy price
       const freshCurve = await fetchBondingCurve(program, mintPubkey);
-      const postBuyPrice = freshCurve
-        ? freshCurve.basePrice.add(freshCurve.slope.mul(freshCurve.currentSupply.div(new BN(10 ** TOKEN_DECIMALS)))).toNumber() / 1e9
-        : displayPrice;
-
-      // Record trade — don't fail the whole flow if API is down
-      try {
-        await recordTrade({
-          tokenMint: mint,
-          traderAddress: publicKey.toBase58(),
-          side: "buy",
-          amount: solAmount,
-          txSignature: txSig,
-          solAmount,
-          price: postBuyPrice,
-        });
-      } catch {
-        // API recording failed but on-chain trade succeeded — continue
-      }
-
       if (freshCurve) setCurveData(freshCurve);
       setBuyStatus("success");
-      await refreshTrades();
+      // Small delay to let onchainListener record the trade
+      setTimeout(async () => { await refreshTrades(); }, 2000);
       setTimeout(() => setBuyStatus("idle"), 3000);
     } catch (err: unknown) {
       setBuyStatus("error");
@@ -320,38 +301,16 @@ export default function TokenDetailPage({
       const atomicAmount = Math.floor(wholeTokens * 10 ** TOKEN_DECIMALS);
       const mintPubkey = new PublicKey(mint);
 
-      const txSig = await sellTokens(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
+      await sellTokens(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
 
-      // On-chain succeeded — clear input immediately
+      // On-chain succeeded — clear input, refresh data
+      // Trade recording handled by onchainListener (no duplicate POST)
       setSellAmount("");
-
-      // Refresh on-chain data BEFORE recording trade so we get the post-sell price
       const freshCurve = await fetchBondingCurve(program, mintPubkey);
-      const postSellPrice = freshCurve
-        ? freshCurve.basePrice.add(freshCurve.slope.mul(freshCurve.currentSupply.div(new BN(10 ** TOKEN_DECIMALS)))).toNumber() / 1e9
-        : displayPrice;
-
-      // Estimate SOL received for display
-      const estimatedSol = wholeTokens * displayPrice * 0.99; // 1% fee
-
-      // Record trade — don't fail the whole flow if API is down
-      try {
-        await recordTrade({
-          tokenMint: mint,
-          traderAddress: publicKey.toBase58(),
-          side: "sell",
-          amount: wholeTokens,
-          txSignature: txSig,
-          solAmount: estimatedSol,
-          price: postSellPrice,
-        });
-      } catch {
-        // API recording failed but on-chain trade succeeded — continue
-      }
-
       setCurveData(freshCurve);
       setSellStatus("success");
-      await refreshTrades();
+      // Small delay to let onchainListener record the trade
+      setTimeout(async () => { await refreshTrades(); }, 2000);
       setTimeout(() => setSellStatus("idle"), 3000);
     } catch (err: unknown) {
       setSellStatus("error");
@@ -645,8 +604,8 @@ export default function TokenDetailPage({
                             </td>
                             <td className="py-2 text-right text-text-primary">
                               {t.side === "buy"
-                                ? `${(t.amount || t.totalSol || 0).toFixed(4)} SOL`
-                                : `${formatCompact(t.amount || 0)} tokens`}
+                                ? `${(t.totalSol || 0).toFixed(4)} SOL`
+                                : `${formatCompact(t.totalSol || 0)} SOL`}
                             </td>
                             <td className="py-2 text-right text-text-muted">
                               {formatTimeAgo(t.createdAt)}
