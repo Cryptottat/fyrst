@@ -287,18 +287,25 @@ export default function TokenDetailPage({
 
       const txSig = await sellTokens(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
 
+      // Refresh on-chain data BEFORE recording trade so we get the post-sell price
+      const freshCurve = await fetchBondingCurve(program, mintPubkey);
+      const postSellPrice = freshCurve
+        ? freshCurve.basePrice.add(freshCurve.slope.mul(freshCurve.currentSupply.div(new BN(10 ** TOKEN_DECIMALS)))).toNumber() / 1e9
+        : displayPrice;
+
       await recordTrade({
         tokenMint: mint,
         traderAddress: publicKey.toBase58(),
         side: "sell",
         amount: wholeTokens,
         txSignature: txSig,
-        price: displayPrice,
+        price: postSellPrice,
       });
 
+      setCurveData(freshCurve);
       setSellStatus("success");
       setSellAmount("");
-      await Promise.all([refreshOnChainData(), refreshTrades()]);
+      await refreshTrades();
       setTimeout(() => setSellStatus("idle"), 3000);
     } catch (err: unknown) {
       setSellStatus("error");
@@ -486,6 +493,7 @@ export default function TokenDetailPage({
                 trades={storeTrades}
                 currentPrice={displayPrice}
                 totalSupply={displaySupply}
+                solPrice={solPrice}
               />
             </Card>
 

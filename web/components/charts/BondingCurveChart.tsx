@@ -7,6 +7,7 @@ interface BondingCurveChartProps {
   trades: ApiTrade[];
   currentPrice: number;
   totalSupply?: number;
+  solPrice?: number;
 }
 
 interface Candle {
@@ -68,6 +69,7 @@ export default function BondingCurveChart({
   trades,
   currentPrice,
   totalSupply,
+  solPrice = 0,
 }: BondingCurveChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<
@@ -174,8 +176,11 @@ export default function BondingCurveChart({
     const series =
       seriesRef.current as import("lightweight-charts").ISeriesApi<"Candlestick">;
     const interval = INTERVALS[intervalIdx].ms;
-    const multiplier =
-      viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
+    // PRICE mode: raw SOL price
+    // MCAP mode: price × supply × solPrice (USD market cap)
+    const usdMul = viewMode === "mcap" && solPrice > 0 ? solPrice : 1;
+    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
+    const multiplier = supplyMul * usdMul;
 
     if (trades.length === 0) {
       // No trades yet — show single candle at current base price
@@ -202,7 +207,7 @@ export default function BondingCurveChart({
     }
 
     chartRef.current?.timeScale().fitContent();
-  }, [trades, currentPrice, intervalIdx, viewMode, totalSupply, chartReady]);
+  }, [trades, currentPrice, intervalIdx, viewMode, totalSupply, solPrice, chartReady]);
 
   // -----------------------------------------------------------------------
   // Price line
@@ -223,8 +228,9 @@ export default function BondingCurveChart({
       }
     }
 
-    const multiplier =
-      viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
+    const usdMul = viewMode === "mcap" && solPrice > 0 ? solPrice : 1;
+    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
+    const multiplier = supplyMul * usdMul;
 
     import("lightweight-charts").then(({ LineStyle }) => {
       const line = series.createPriceLine({
@@ -237,7 +243,7 @@ export default function BondingCurveChart({
       });
       priceLineRef.current = line;
     });
-  }, [currentPrice, viewMode, totalSupply, chartReady]);
+  }, [currentPrice, viewMode, totalSupply, solPrice, chartReady]);
 
   // -----------------------------------------------------------------------
   // UI
@@ -274,7 +280,7 @@ export default function BondingCurveChart({
             onClick={() => setViewMode("mcap")}
             className={btnClass(viewMode === "mcap")}
           >
-            MCAP
+            MCAP $
           </button>
         </div>
       </div>

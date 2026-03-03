@@ -106,30 +106,9 @@ tradeRouter.post(
           return;
         }
 
-        // Validate seller has enough balance
-        const buyerRecord = await prisma.buyerRecord.findUnique({
-          where: {
-            buyerAddress_tokenMint: {
-              buyerAddress: traderAddress,
-              tokenMint,
-            },
-          },
-        });
-
-        const balance = buyerRecord
-          ? buyerRecord.totalBought - buyerRecord.totalSold
-          : 0;
-
-        if (balance < amount) {
-          res.status(400).json({
-            success: false,
-            error: `Insufficient balance. You have ${balance} tokens.`,
-          });
-          return;
-        }
-
-        totalSol = calculateSellReturn(currentSupply, amount);
-        newSupply = currentSupply - amount;
+        // On-chain TX already validated balance — just record the trade
+        totalSol = clientSolAmount ?? calculateSellReturn(currentSupply, amount);
+        newSupply = Math.max(currentSupply - amount, 0);
       }
 
       const newPrice = spotPrice(newSupply);
