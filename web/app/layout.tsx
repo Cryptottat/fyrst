@@ -65,16 +65,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // WalletProvider now derives RPC from NEXT_PUBLIC_SOLANA_NETWORK + NEXT_PUBLIC_HELIUS_API_KEY
-  // Explicit NEXT_PUBLIC_SOLANA_RPC still works as override
-  const rpcEndpoint = process.env.SOLANA_RPC || process.env.NEXT_PUBLIC_SOLANA_RPC;
-
   return (
     <html lang="en">
       <body
         className={`${pressStart2P.variable} ${dmSans.variable} ${jetbrainsMono.variable} ${vt323.variable} font-sans antialiased bg-bg text-text-primary`}
       >
-        <WalletProvider rpcEndpoint={rpcEndpoint}>
+        <WalletProvider>
           <SocketProvider>
             {/* CRT scanline + vignette overlay */}
             <div className="crt-overlay" />

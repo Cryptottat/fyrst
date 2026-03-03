@@ -407,7 +407,7 @@ export default function LaunchPage() {
               </Button>
               <p className="text-[9px] text-text-muted text-center mt-3 font-mono">
                 <span className="text-primary">&gt; </span>
-                {connected ? `Creates escrow + bonding curve on ${process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet"}.` : "Connect wallet first."}
+                {connected ? `Creates escrow + bonding curve on ${process.env.NEXT_PUBLIC_DEVNET !== "false" ? "devnet" : "mainnet"}.` : "Connect wallet first."}
               </p>
             </div>
           </form>

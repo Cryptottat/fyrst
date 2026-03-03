@@ -35,7 +35,7 @@ function getTreasuryKeypair(): Keypair | null {
 }
 
 function getConnection(): Connection {
-  const rpc = config.heliusRpcUrl || config.solanaRpc;
+  const rpc = config.solanaRpc;
   return new Connection(rpc, "confirmed");
 }
 

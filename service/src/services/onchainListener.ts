@@ -24,7 +24,7 @@ let rpcConnection: Connection | null = null;
  * involving the FYRST program.
  */
 export function startOnchainListener(): void {
-  const rpcUrl = config.heliusRpcUrl || config.quicknodeRpcUrl || config.solanaRpc;
+  const rpcUrl = config.solanaRpc;
   if (!rpcUrl) {
     logger.warn("No RPC URL configured — on-chain listener disabled");
     return;

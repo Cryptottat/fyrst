@@ -43,7 +43,7 @@ let connectionInstance: Connection | null = null;
  */
 export function getConnection(): Connection {
   if (!connectionInstance) {
-    const rpcUrl = config.quicknodeRpcUrl;
+    const rpcUrl = config.solanaRpc;
     logger.info(`Solana RPC: initializing connection to ${rpcUrl.split("?")[0]}...`);
     connectionInstance = new Connection(rpcUrl, {
       commitment: "confirmed",

@@ -121,12 +121,11 @@ export default function TokenDetailPage({
   }, [mint]);
 
   // Explorer URL helper — Solana Explorer for devnet, Solscan for mainnet
-  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet";
-  const isMainnet = network === "mainnet";
+  const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
   const explorerUrl = (type: "tx" | "address" | "token", value: string) =>
-    isMainnet
-      ? `https://solscan.io/${type}/${value}`
-      : `https://explorer.solana.com/${type === "token" ? "address" : type}/${value}?cluster=devnet`;
+    isDevnet
+      ? `https://explorer.solana.com/${type === "token" ? "address" : type}/${value}?cluster=devnet`
+      : `https://solscan.io/${type}/${value}`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -507,7 +506,7 @@ export default function TokenDetailPage({
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-[9px] font-display px-3 py-1.5 border border-border text-text-muted hover:border-primary hover:text-primary transition-colors"
                 >
-                  <ExternalLink className="w-3 h-3" /> {isMainnet ? "SOLSCAN" : "EXPLORER"}
+                  <ExternalLink className="w-3 h-3" /> {isDevnet ? "EXPLORER" : "SOLSCAN"}
                 </a>
               </div>
             </div>

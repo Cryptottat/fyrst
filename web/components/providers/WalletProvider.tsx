@@ -16,21 +16,16 @@ import {
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 // ---------------------------------------------------------------------------
-// Derive Solana RPC from NEXT_PUBLIC_SOLANA_NETWORK + NEXT_PUBLIC_HELIUS_API_KEY
-// Priority: explicit NEXT_PUBLIC_SOLANA_RPC > Helius-derived > public fallback
+// Single switch: NEXT_PUBLIC_DEVNET=true (default) or false for mainnet
+// Helius key from NEXT_PUBLIC_HELIUS_API_KEY — same key works for both networks
 // ---------------------------------------------------------------------------
 function getDefaultEndpoint(): string {
-  const explicit = process.env.NEXT_PUBLIC_SOLANA_RPC;
-  if (explicit) return explicit;
-
-  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet";
+  const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
   const heliusKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
   if (heliusKey) {
-    const host = network === "mainnet" ? "mainnet" : "devnet";
-    return `https://${host}.helius-rpc.com/?api-key=${heliusKey}`;
+    return `https://${isDevnet ? "devnet" : "mainnet"}.helius-rpc.com/?api-key=${heliusKey}`;
   }
-
-  return clusterApiUrl(network === "mainnet" ? "mainnet-beta" : "devnet");
+  return clusterApiUrl(isDevnet ? "devnet" : "mainnet-beta");
 }
 
 interface Props {

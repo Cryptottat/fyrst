@@ -264,10 +264,10 @@ export async function getWalletHistory(
 export async function getTokenMetadata(
   mintAddress: string
 ): Promise<HeliusDASAsset | null> {
-  const rpcUrl = config.heliusRpcUrl;
+  const rpcUrl = config.solanaRpc;
   if (!rpcUrl) {
     logger.warn(
-      "Helius RPC URL not configured -- cannot fetch token metadata"
+      "Solana RPC URL not configured -- cannot fetch token metadata"
     );
     return null;
   }
