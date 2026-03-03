@@ -97,6 +97,20 @@ export default function TokenDetailPage({
   const setTrades = useAppStore((s) => s.setTrades);
   const priceSnapshot = useAppStore((s) => s.prices.get(mint));
   const solPrice = useAppStore((s) => s.solPrice);
+  const setSolPrice = useAppStore((s) => s.setSolPrice);
+
+  // Fallback: fetch SOL price from Jupiter if WebSocket hasn't provided it
+  useEffect(() => {
+    if (solPrice > 0) return;
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    fetch(`https://api.jup.ag/price/v2?ids=${SOL_MINT}`)
+      .then((r) => r.json())
+      .then((json: { data?: Record<string, { price?: string }> }) => {
+        const p = json?.data?.[SOL_MINT]?.price;
+        if (p) setSolPrice(parseFloat(p));
+      })
+      .catch(() => { /* silent */ });
+  }, [solPrice, setSolPrice]);
 
   // Derive pool (bonding curve) PDA
   const poolAddress = useMemo(() => {
@@ -105,6 +119,14 @@ export default function TokenDetailPage({
       return pda.toBase58();
     } catch { return null; }
   }, [mint]);
+
+  // Explorer URL helper — Solana Explorer for devnet, Solscan for mainnet
+  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet";
+  const isMainnet = network === "mainnet";
+  const explorerUrl = (type: "tx" | "address" | "token", value: string) =>
+    isMainnet
+      ? `https://solscan.io/${type}/${value}`
+      : `https://explorer.solana.com/${type === "token" ? "address" : type}/${value}?cluster=devnet`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -242,19 +264,33 @@ export default function TokenDetailPage({
 
       const txSig = await buyTokens(program, publicKey, mintPubkey, lamports, slippageBps);
 
-      await recordTrade({
-        tokenMint: mint,
-        traderAddress: publicKey.toBase58(),
-        side: "buy",
-        amount: solAmount,
-        txSignature: txSig,
-        solAmount,
-        price: displayPrice,
-      });
-
-      setBuyStatus("success");
+      // On-chain succeeded — clear input immediately
       setBuyAmount("");
-      await Promise.all([refreshOnChainData(), refreshTrades()]);
+
+      // Refresh on-chain data to get post-buy price
+      const freshCurve = await fetchBondingCurve(program, mintPubkey);
+      const postBuyPrice = freshCurve
+        ? freshCurve.basePrice.add(freshCurve.slope.mul(freshCurve.currentSupply.div(new BN(10 ** TOKEN_DECIMALS)))).toNumber() / 1e9
+        : displayPrice;
+
+      // Record trade — don't fail the whole flow if API is down
+      try {
+        await recordTrade({
+          tokenMint: mint,
+          traderAddress: publicKey.toBase58(),
+          side: "buy",
+          amount: solAmount,
+          txSignature: txSig,
+          solAmount,
+          price: postBuyPrice,
+        });
+      } catch {
+        // API recording failed but on-chain trade succeeded — continue
+      }
+
+      if (freshCurve) setCurveData(freshCurve);
+      setBuyStatus("success");
+      await refreshTrades();
       setTimeout(() => setBuyStatus("idle"), 3000);
     } catch (err: unknown) {
       setBuyStatus("error");
@@ -287,24 +323,35 @@ export default function TokenDetailPage({
 
       const txSig = await sellTokens(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
 
+      // On-chain succeeded — clear input immediately
+      setSellAmount("");
+
       // Refresh on-chain data BEFORE recording trade so we get the post-sell price
       const freshCurve = await fetchBondingCurve(program, mintPubkey);
       const postSellPrice = freshCurve
         ? freshCurve.basePrice.add(freshCurve.slope.mul(freshCurve.currentSupply.div(new BN(10 ** TOKEN_DECIMALS)))).toNumber() / 1e9
         : displayPrice;
 
-      await recordTrade({
-        tokenMint: mint,
-        traderAddress: publicKey.toBase58(),
-        side: "sell",
-        amount: wholeTokens,
-        txSignature: txSig,
-        price: postSellPrice,
-      });
+      // Estimate SOL received for display
+      const estimatedSol = wholeTokens * displayPrice * 0.99; // 1% fee
+
+      // Record trade — don't fail the whole flow if API is down
+      try {
+        await recordTrade({
+          tokenMint: mint,
+          traderAddress: publicKey.toBase58(),
+          side: "sell",
+          amount: wholeTokens,
+          txSignature: txSig,
+          solAmount: estimatedSol,
+          price: postSellPrice,
+        });
+      } catch {
+        // API recording failed but on-chain trade succeeded — continue
+      }
 
       setCurveData(freshCurve);
       setSellStatus("success");
-      setSellAmount("");
       await refreshTrades();
       setTimeout(() => setSellStatus("idle"), 3000);
     } catch (err: unknown) {
@@ -455,12 +502,12 @@ export default function TokenDetailPage({
                   </button>
                 )}
                 <a
-                  href={`https://solscan.io/token/${mint}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet"}`}
+                  href={explorerUrl("token", mint)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-[9px] font-display px-3 py-1.5 border border-border text-text-muted hover:border-primary hover:text-primary transition-colors"
                 >
-                  <ExternalLink className="w-3 h-3" /> SOLSCAN
+                  <ExternalLink className="w-3 h-3" /> {isMainnet ? "SOLSCAN" : "EXPLORER"}
                 </a>
               </div>
             </div>
@@ -589,7 +636,7 @@ export default function TokenDetailPage({
                             </td>
                             <td className="py-2">
                               <a
-                                href={`https://solscan.io/account/${t.traderAddress}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet"}`}
+                                href={explorerUrl("address", t.traderAddress)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-primary hover:text-primary/80 transition-colors"
@@ -599,7 +646,7 @@ export default function TokenDetailPage({
                             </td>
                             <td className="py-2 text-right text-text-primary">
                               {t.side === "buy"
-                                ? `${(t.totalSol || t.amount || 0).toFixed(4)} SOL`
+                                ? `${(t.amount || t.totalSol || 0).toFixed(4)} SOL`
                                 : `${formatCompact(t.amount || 0)} tokens`}
                             </td>
                             <td className="py-2 text-right text-text-muted">
@@ -608,7 +655,7 @@ export default function TokenDetailPage({
                             <td className="py-2 text-right">
                               {t.txSignature && (
                                 <a
-                                  href={`https://solscan.io/tx/${t.txSignature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet"}`}
+                                  href={explorerUrl("tx", t.txSignature)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-primary hover:text-primary/80 transition-colors"

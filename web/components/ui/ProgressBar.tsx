@@ -21,7 +21,7 @@ export default function ProgressBar({
         <div className="flex justify-between mb-1">
           <span className="text-[9px] font-display text-text-muted">HP</span>
           <span className="text-xs font-score text-text-secondary neon-text-subtle">
-            {clamped}/100
+            {clamped < 0.01 ? "0" : clamped < 1 ? clamped.toFixed(2) : Math.round(clamped)}/100
           </span>
         </div>
       )}

@@ -65,7 +65,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 서버 컴포넌트에서 읽으므로 NEXT_PUBLIC_ 없이도 동작 — 키가 번들에 노출되지 않음
+  // WalletProvider now derives RPC from NEXT_PUBLIC_SOLANA_NETWORK + NEXT_PUBLIC_HELIUS_API_KEY
+  // Explicit NEXT_PUBLIC_SOLANA_RPC still works as override
   const rpcEndpoint = process.env.SOLANA_RPC || process.env.NEXT_PUBLIC_SOLANA_RPC;
 
   return (

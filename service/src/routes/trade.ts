@@ -94,25 +94,18 @@ tradeRouter.post(
       let newSupply: number;
 
       if (side === "buy") {
-        totalSol = calculateBuyCost(currentSupply, amount);
-        newSupply = currentSupply + amount;
+        // amount = SOL spent (from frontend); use directly as totalSol
+        totalSol = clientSolAmount ?? amount;
+        // We cannot know exact token count from frontend — keep supply approximate
+        newSupply = currentSupply;
       } else {
-        // Validate sufficient supply
-        if (amount > currentSupply) {
-          res.status(400).json({
-            success: false,
-            error: "Sell amount exceeds current supply",
-          });
-          return;
-        }
-
         // On-chain TX already validated balance — just record the trade
-        totalSol = clientSolAmount ?? calculateSellReturn(currentSupply, amount);
+        totalSol = clientSolAmount ?? calculateSellReturn(currentSupply, Math.min(amount, currentSupply));
         newSupply = Math.max(currentSupply - amount, 0);
       }
 
-      const newPrice = spotPrice(newSupply);
-      const slippage = estimateSlippage(currentSupply, amount, side);
+      const newPrice = clientPrice || spotPrice(newSupply);
+      const slippage = estimateSlippage(currentSupply, Math.min(amount, Math.max(currentSupply, 1)), side);
       const newMarketCap = newSupply * newPrice;
       const progress = calculateProgress(newSupply, newPrice);
       const graduated = progress >= 100;

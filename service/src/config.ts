@@ -1,14 +1,33 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+// ---------------------------------------------------------------------------
+// Derive Solana RPC URL from SOLANA_NETWORK + HELIUS_API_KEY
+// Priority: explicit SOLANA_RPC_URL > Helius-derived > public fallback
+// ---------------------------------------------------------------------------
+const solanaNetwork = (process.env.SOLANA_NETWORK || "devnet") as "devnet" | "mainnet";
+const heliusApiKey = process.env.HELIUS_API_KEY || "";
+
+function deriveSolanaRpc(): string {
+  if (process.env.SOLANA_RPC_URL) return process.env.SOLANA_RPC_URL;
+  if (heliusApiKey) {
+    const host = solanaNetwork === "mainnet" ? "mainnet" : "devnet";
+    return `https://${host}.helius-rpc.com/?api-key=${heliusApiKey}`;
+  }
+  return solanaNetwork === "mainnet"
+    ? "https://api.mainnet-beta.solana.com"
+    : "https://api.devnet.solana.com";
+}
+
 export const config = {
   port: parseInt(process.env.PORT || "8000", 10),
   corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:3000").split(","),
   nodeEnv: process.env.NODE_ENV || "development",
   logLevel: process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug"),
   // Solana
-  solanaRpc: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
-  heliusApiKey: process.env.HELIUS_API_KEY || "",
+  solanaNetwork,
+  solanaRpc: deriveSolanaRpc(),
+  heliusApiKey,
   heliusRpcUrl: process.env.HELIUS_RPC_URL || "",
   quicknodeRpcUrl: process.env.QUICKNODE_RPC_URL || "",
   jupiterApiUrl: process.env.JUPITER_API_URL || "https://api.jup.ag",
