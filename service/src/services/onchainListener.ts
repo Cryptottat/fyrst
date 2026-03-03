@@ -215,20 +215,23 @@ async function upsertTradeRecord(
   const token = await prisma.token.findUnique({ where: { mint: tokenMint } });
   if (!token) return;
 
+  // tokenAmount from on-chain is in atomic units (6 decimals) — convert to whole tokens
+  const wholeTokens = tokenAmount / 1e6;
+
   const currentSupply = token.totalSupply;
-  const newSupply = side === "buy" ? currentSupply + tokenAmount : currentSupply - tokenAmount;
+  const newSupply = side === "buy" ? currentSupply + wholeTokens : Math.max(currentSupply - wholeTokens, 0);
   const newPrice = spotPrice(newSupply);
   const newMarketCap = newSupply * newPrice;
   const progress = calculateProgress(newSupply, newPrice);
   const graduated = progress >= 100;
 
-  // Record trade
+  // Record trade (amount = whole tokens, totalSol = SOL)
   const trade = await prisma.trade.create({
     data: {
       tokenMint,
       traderAddress,
       side,
-      amount: tokenAmount,
+      amount: wholeTokens,
       price: newPrice,
       totalSol: solAmount,
       txSignature,
@@ -255,13 +258,13 @@ async function upsertTradeRecord(
         buyerAddress_tokenMint: { buyerAddress: traderAddress, tokenMint },
       },
       update: {
-        totalBought: { increment: tokenAmount },
+        totalBought: { increment: wholeTokens },
         avgPrice: newPrice,
       },
       create: {
         buyerAddress: traderAddress,
         tokenMint,
-        totalBought: tokenAmount,
+        totalBought: wholeTokens,
         avgPrice: newPrice,
       },
     });
@@ -271,7 +274,7 @@ async function upsertTradeRecord(
         where: {
           buyerAddress_tokenMint: { buyerAddress: traderAddress, tokenMint },
         },
-        data: { totalSold: { increment: tokenAmount } },
+        data: { totalSold: { increment: wholeTokens } },
       });
     } catch {
       // Buyer record might not exist for direct on-chain sells
@@ -284,7 +287,7 @@ async function upsertTradeRecord(
     tokenMint,
     traderAddress,
     side,
-    amount: tokenAmount,
+    amount: wholeTokens,
     price: newPrice,
     totalSol: solAmount,
     txSignature,

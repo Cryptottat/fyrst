@@ -10,10 +10,23 @@ import {
   formatCompact,
   formatTimeAgo,
   getReputationGrade,
+  formatSol,
 } from "@/lib/utils";
-import { Search } from "lucide-react";
+import { Search, Clock, Shield } from "lucide-react";
 
 type SortKey = "lastTrade" | "newest" | "marketCap" | "reputation" | "pressure" | "deadline" | "collateral";
+
+/** Format remaining time as compact string */
+function formatRemaining(deadlineStr: string | null): string {
+  if (!deadlineStr) return "--";
+  const remaining = new Date(deadlineStr).getTime() - Date.now();
+  if (remaining <= 0) return "EXPIRED";
+  const hours = Math.floor(remaining / 3600000);
+  const mins = Math.floor((remaining % 3600000) / 60000);
+  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
 
 function TokenCard({ token, index, flash }: { token: ApiToken; index: number; flash: boolean }) {
   const score = token.deployer?.reputationScore ?? 50;
@@ -78,7 +91,7 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
 
         <ProgressBar value={liveProgress} className="mb-3" />
 
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center justify-between text-xs mb-2">
           <div>
             <span className="text-text-muted font-display text-[8px]">MCap </span>
             <span
@@ -90,7 +103,7 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
                     : "text-text-secondary"
               }`}
             >
-              ${formatCompact(liveMcap)}
+              {solPrice > 0 ? `$${formatCompact(liveMcap)}` : `${formatCompact(liveMcapSol)} SOL`}
             </span>
             {changePercent !== 0 && (
               <span
@@ -104,6 +117,18 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
           </div>
           <span className="text-[9px] text-text-muted font-mono">
             {formatTimeAgo(token.createdAt)}
+          </span>
+        </div>
+
+        {/* Deadline + Escrow */}
+        <div className="flex items-center justify-between text-[8px] text-text-muted font-mono border-t border-border/30 pt-2">
+          <span className="flex items-center gap-1">
+            <Clock className="w-2.5 h-2.5" />
+            {formatRemaining(token.deadlineTimestamp)}
+          </span>
+          <span className="flex items-center gap-1">
+            <Shield className="w-2.5 h-2.5" />
+            {formatSol(token.collateralAmount)}
           </span>
         </div>
       </div>
@@ -121,6 +146,21 @@ export default function DashboardPage() {
 
   const tokens = useAppStore((s) => s.tokens);
   const setTokens = useAppStore((s) => s.setTokens);
+  const solPrice = useAppStore((s) => s.solPrice);
+  const setSolPrice = useAppStore((s) => s.setSolPrice);
+
+  // Fallback: fetch SOL price if WebSocket hasn't provided it
+  useEffect(() => {
+    if (solPrice > 0) return;
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    fetch(`https://api.jup.ag/price/v2?ids=${SOL_MINT}`)
+      .then((r) => r.json())
+      .then((json: { data?: Record<string, { price?: string }> }) => {
+        const p = json?.data?.[SOL_MINT]?.price;
+        if (p) setSolPrice(parseFloat(p));
+      })
+      .catch(() => {});
+  }, [solPrice, setSolPrice]);
 
   useEffect(() => {
     let cancelled = false;

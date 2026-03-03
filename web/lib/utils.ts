@@ -8,10 +8,29 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 /**
- * Format a number as a compact string (e.g., 1.2K, 3.4M).
+ * Format a number as a compact string.
+ * 5000 → 5K, 1234 → 1.23K, 15000 → 15K, 1500000 → 1.5M
  */
 export function formatCompact(value: number): string {
-  return Intl.NumberFormat("en", { notation: "compact" }).format(value);
+  if (!isFinite(value) || value === 0) return "0";
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+
+  if (abs >= 1e9) {
+    const n = abs / 1e9;
+    return sign + (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : Math.round(n).toString()) + "B";
+  }
+  if (abs >= 1e6) {
+    const n = abs / 1e6;
+    return sign + (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : Math.round(n).toString()) + "M";
+  }
+  if (abs >= 1e3) {
+    const n = abs / 1e3;
+    return sign + (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : Math.round(n).toString()) + "K";
+  }
+  if (abs >= 100) return sign + Math.round(abs).toString();
+  if (abs >= 10) return sign + abs.toFixed(1);
+  return sign + abs.toFixed(2);
 }
 
 /**
