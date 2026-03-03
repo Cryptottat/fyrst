@@ -8,7 +8,7 @@ import { prisma, dbConnected } from "../lib/prisma";
 
 const BASE_PRICE = 0.0001; // SOL per token at supply = 0
 const SLOPE = 0.00000001; // Price increase per unit of supply
-const GRADUATION_MARKET_CAP = 69_000; // SOL market cap to graduate (like pump.fun)
+const GRADUATION_RESERVE_SOL = 5; // SOL reserve to graduate (devnet testing — matches on-chain GRADUATION_THRESHOLD)
 
 // ---------------------------------------------------------------------------
 // Pure calculation helpers
@@ -76,13 +76,16 @@ export function estimateSlippage(
 
 /**
  * Calculate the bonding curve progress towards graduation (0-100).
+ * Based on reserve balance vs on-chain GRADUATION_THRESHOLD (85 SOL).
+ * Reserve ≈ integral of price over supply = basePrice*S + slope*S^2/2.
  */
 export function calculateProgress(
   currentSupply: number,
   currentPrice: number
 ): number {
-  const marketCap = currentSupply * currentPrice;
-  const progress = (marketCap / GRADUATION_MARKET_CAP) * 100;
+  // Approximate reserve from integral: basePrice*S + slope*S^2/2
+  const reserve = BASE_PRICE * currentSupply + SLOPE * currentSupply * currentSupply / 2;
+  const progress = (reserve / GRADUATION_RESERVE_SOL) * 100;
   return Math.min(100, progress);
 }
 

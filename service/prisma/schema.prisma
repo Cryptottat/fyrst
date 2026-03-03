@@ -48,6 +48,8 @@ model Token {
   collateralTier      String   @default("Iron") @map("collateral_tier") @db.VarChar(10)
   deadlineTimestamp   DateTime? @map("deadline_timestamp")
   graduated           Boolean  @default(false)
+  dexMigrated         Boolean  @default(false) @map("dex_migrated")
+  raydiumPool         String?  @map("raydium_pool") @db.VarChar(64)
   bondingCurveProgress Float   @default(0) @map("bonding_curve_progress")
   createdAt           DateTime @default(now()) @map("created_at")
 

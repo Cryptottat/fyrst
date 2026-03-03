@@ -374,6 +374,316 @@
       "args": []
     },
     {
+      "name": "graduate_to_dex",
+      "docs": [
+        "Migrate graduated token to Raydium CPMM DEX (permissionless)"
+      ],
+      "discriminator": [
+        83,
+        110,
+        46,
+        201,
+        206,
+        12,
+        95,
+        44
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone can trigger graduation (permissionless)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bonding_curve",
+          "docs": [
+            "Bonding curve PDA — must be graduated and not yet migrated"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bonding_curve.token_mint",
+                "account": "BondingCurve"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint",
+          "docs": [
+            "Token mint (curve PDA is mint authority)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "wsol_mint",
+          "docs": [
+            "WSOL mint"
+          ],
+          "writable": true
+        },
+        {
+          "name": "curve_token_account",
+          "docs": [
+            "Curve PDA's token ATA (holds tokens for Raydium deposit)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "bonding_curve"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "curve_wsol_account",
+          "docs": [
+            "Curve PDA's WSOL ATA (holds wrapped SOL for Raydium deposit)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "bonding_curve"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wsol_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "cp_swap_program"
+        },
+        {
+          "name": "amm_config"
+        },
+        {
+          "name": "raydium_authority"
+        },
+        {
+          "name": "pool_state",
+          "writable": true
+        },
+        {
+          "name": "token_0_vault",
+          "writable": true
+        },
+        {
+          "name": "token_1_vault",
+          "writable": true
+        },
+        {
+          "name": "create_pool_fee",
+          "writable": true
+        },
+        {
+          "name": "lp_mint",
+          "writable": true
+        },
+        {
+          "name": "creator_lp_token",
+          "docs": [
+            "LP token account for curve PDA (receives LP, then burned)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "observation_state",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "init_bonding_curve",
       "docs": [
         "Initialize bonding curve with SPL token mint + metadata"
@@ -964,6 +1274,55 @@
       ]
     },
     {
+      "name": "update_graduation_threshold",
+      "docs": [
+        "Update graduation threshold (authority only)"
+      ],
+      "discriminator": [
+        183,
+        248,
+        147,
+        177,
+        229,
+        195,
+        85,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "protocol_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_threshold",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "update_treasury",
       "docs": [
         "Update protocol treasury (authority only)"
@@ -1129,6 +1488,16 @@
       "code": 6014,
       "name": "NoFeesToClaim",
       "msg": "No fees to claim"
+    },
+    {
+      "code": 6015,
+      "name": "AlreadyMigratedToDex",
+      "msg": "Token already migrated to DEX"
+    },
+    {
+      "code": 6016,
+      "name": "EmptyReserve",
+      "msg": "Reserve balance is zero — nothing to migrate"
     }
   ],
   "types": [
@@ -1223,6 +1592,20 @@
               "Bump seed for PDA"
             ],
             "type": "u8"
+          },
+          {
+            "name": "dex_migrated",
+            "docs": [
+              "Whether the token has been migrated to Raydium DEX"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "raydium_pool",
+            "docs": [
+              "Raydium CPMM pool address (set after graduation migration)"
+            ],
+            "type": "pubkey"
           }
         ]
       }

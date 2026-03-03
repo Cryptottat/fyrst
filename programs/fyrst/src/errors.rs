@@ -46,4 +46,10 @@ pub enum FyrstError {
 
     #[msg("No fees to claim")]
     NoFeesToClaim,
+
+    #[msg("Token already migrated to DEX")]
+    AlreadyMigratedToDex,
+
+    #[msg("Reserve balance is zero — nothing to migrate")]
+    EmptyReserve,
 }

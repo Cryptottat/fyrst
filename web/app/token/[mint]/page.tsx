@@ -17,6 +17,7 @@ import {
   buyTokens,
   sellTokens,
   claimFees,
+  graduateToDex,
   TOKEN_DECIMALS,
   type BondingCurveData,
 } from "@/lib/anchor";
@@ -201,8 +202,9 @@ export default function TokenDetailPage({
         .toNumber() / 1e9
     : null;
 
+  // On-chain supply is in atomic units (6 decimals) — convert to whole tokens
   const onChainSupply = curveData
-    ? curveData.currentSupply.toNumber()
+    ? curveData.currentSupply.toNumber() / 1e6
     : null;
 
   // Priority: live socket price > on-chain > API
@@ -334,10 +336,29 @@ export default function TokenDetailPage({
     }
   };
 
+  // DEX migration
+  const [migrateStatus, setMigrateStatus] = useState<TxStatus>("idle");
+
+  const handleGraduateToDex = async () => {
+    if (!program || !publicKey) return;
+    setMigrateStatus("loading");
+    setTxError(null);
+    try {
+      await graduateToDex(program, publicKey, new PublicKey(mint));
+      setMigrateStatus("success");
+      await refreshOnChainData();
+      setTimeout(() => setMigrateStatus("idle"), 3000);
+    } catch (err: unknown) {
+      setMigrateStatus("error");
+      setTxError(err instanceof Error ? err.message : "Migration failed");
+      setTimeout(() => setMigrateStatus("idle"), 3000);
+    }
+  };
+
   // Is current wallet the deployer of this token?
   const isDeployer = publicKey && curveData && publicKey.toBase58() === curveData.deployer.toBase58();
   // Progressive fee unlock: unlocked = (totalDeployerFees * maxReserveReached) / GRADUATION_THRESHOLD
-  const GRADUATION_THRESHOLD_LAMPORTS = 85_000_000_000;
+  const GRADUATION_THRESHOLD_LAMPORTS = 5_000_000_000;
   const claimableFeesLamports = (() => {
     if (!curveData) return 0;
     const total = curveData.totalDeployerFees?.toNumber() ?? 0;
@@ -380,10 +401,15 @@ export default function TokenDetailPage({
   const score = deployer?.reputationScore ?? token.deployer?.reputationScore ?? 50;
   const grade = getReputationGrade(score);
   const tier = token.collateralTier || "Bronze";
-  const collateralSol = tier === "Diamond" ? 25 : tier === "Gold" ? 10 : tier === "Silver" ? 5 : 0.01;
+  // Use actual collateral from API, fallback to tier lookup from constants
+  const collateralSol = token.collateralAmount || (() => {
+    const tierMap: Record<string, number> = { Diamond: 10, Platinum: 5, Gold: 3, Silver: 1, Bronze: 0.5, Iron: 0.1 };
+    return tierMap[tier] ?? 0.1;
+  })();
+  // Progress based on reserve vs on-chain graduation threshold (5 SOL = 5_000_000_000 lamports, devnet testing)
   const progress = priceSnapshot?.bondingCurveProgress
     ?? (curveData
-      ? Math.min(100, Math.floor((curveData.reserveBalance.toNumber() / (69_000 * 1e9)) * 100))
+      ? Math.min(100, Math.floor((curveData.reserveBalance.toNumber() / GRADUATION_THRESHOLD_LAMPORTS) * 100))
       : token.bondingCurveProgress);
 
   const { clean: cleanDescription, social: socialLinks } = parseSocial(token.description);
@@ -513,8 +539,8 @@ export default function TokenDetailPage({
                 <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">MCAP (USD)</p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
                   {solPrice > 0
-                    ? `$${formatCompact(displayPrice * (displaySupply / 1e6) * solPrice)}`
-                    : `${formatCompact(displayPrice * (displaySupply / 1e6))} SOL`}
+                    ? `$${formatCompact(displayPrice * displaySupply * solPrice)}`
+                    : `${formatCompact(displayPrice * displaySupply)} SOL`}
                 </p>
               </Card>
               <Card padding="sm">
@@ -538,11 +564,75 @@ export default function TokenDetailPage({
               <ProgressBar value={progress} />
               <p className="text-[10px] text-text-muted mt-2 font-mono">
                 <span className="text-primary">&gt; </span>
-                {progress >= 100
-                  ? "Curve complete. Token graduated to DEX."
-                  : `${100 - progress}% until graduation.`}
+                {curveData?.dexMigrated
+                  ? "Graduated & migrated to Raydium DEX."
+                  : progress >= 100
+                    ? "Curve complete. Ready for DEX migration."
+                    : `${100 - progress}% until graduation.`}
               </p>
             </Card>
+
+            {/* Graduated + DEX migrated banner */}
+            {curveData?.dexMigrated && (
+              <Card padding="lg">
+                <div className="text-center space-y-3">
+                  <Badge label="GRADUATED" variant="reputation" />
+                  <p className="text-xs text-text-secondary font-mono">
+                    This token has graduated and is now trading on Raydium DEX.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <a
+                      href={`https://raydium.io/swap/?inputMint=sol&outputMint=${mint}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[10px] font-display px-4 py-2 border border-primary text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" /> TRADE ON RAYDIUM
+                    </a>
+                    {curveData.raydiumPool && (
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(curveData.raydiumPool.toBase58(), "raydium")}
+                        className="inline-flex items-center gap-1.5 text-[10px] font-display px-4 py-2 border border-border text-text-muted hover:border-primary hover:text-primary transition-colors cursor-pointer"
+                      >
+                        {copied === "raydium" ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+                        {copied === "raydium" ? "COPIED!" : "COPY POOL ADDRESS"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Graduated but not yet migrated — show migrate button */}
+            {curveData?.graduated && !curveData?.dexMigrated && (
+              <Card padding="lg">
+                <div className="text-center space-y-3">
+                  <p className="text-[10px] font-display text-text-muted tracking-wider">READY FOR DEX MIGRATION</p>
+                  <p className="text-xs text-text-secondary font-mono">
+                    Bonding curve is full. Migrate liquidity to Raydium to enable DEX trading.
+                  </p>
+                  <Button
+                    variant="primary"
+                    className="w-full"
+                    onClick={handleGraduateToDex}
+                    disabled={!connected || migrateStatus === "loading"}
+                  >
+                    {migrateStatus === "loading" ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> MIGRATING TO RAYDIUM...
+                      </span>
+                    ) : migrateStatus === "success" ? (
+                      "MIGRATED!"
+                    ) : !connected ? (
+                      "CONNECT WALLET"
+                    ) : (
+                      "[ MIGRATE TO RAYDIUM DEX ]"
+                    )}
+                  </Button>
+                </div>
+              </Card>
+            )}
 
             {/* Trades / Comments tabs */}
             <Card padding="lg">
@@ -742,7 +832,7 @@ export default function TokenDetailPage({
               )}
             </Card>
 
-            <Card>
+            {!curveData?.dexMigrated && (<Card>
               <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">BUY</h3>
               <div className="space-y-3">
                 <div>
@@ -779,9 +869,9 @@ export default function TokenDetailPage({
                   )}
                 </Button>
               </div>
-            </Card>
+            </Card>)}
 
-            <Card>
+            {!curveData?.dexMigrated && (<Card>
               <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">SELL</h3>
               <div className="space-y-3">
                 {connected && splBalance > 0 && (
@@ -844,7 +934,7 @@ export default function TokenDetailPage({
                   )}
                 </Button>
               </div>
-            </Card>
+            </Card>)}
 
             {txError && (
               <Card>

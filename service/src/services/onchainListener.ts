@@ -121,6 +121,15 @@ async function processLogs(logs: Logs): Promise<void> {
       continue;
     }
 
+    // Match DEX migration: "DEX migration: mint=ADDR, pool=ADDR, sol=AMOUNT, tokens=AMOUNT"
+    const dexMatch = log.match(
+      /DEX migration: mint=(\S+), pool=(\S+), sol=(\d+), tokens=(\d+)/,
+    );
+    if (dexMatch) {
+      await handleDexMigration(dexMatch[1], dexMatch[2], signature);
+      continue;
+    }
+
     // Match refund: "Refund: buyer=ADDR, tokens_burned=AMOUNT, sol_refunded=AMOUNT"
     const refundMatch = log.match(
       /Refund: buyer=(\S+), tokens_burned=(\d+), sol_refunded=(\d+)/,
@@ -321,6 +330,38 @@ async function upsertTradeRecord(
   logger.info(
     `On-chain ${side} recorded: ${tokenAmount} tokens, ${solAmount} SOL, tx=${txSignature}`,
   );
+}
+
+async function handleDexMigration(
+  tokenMint: string,
+  poolAddress: string,
+  signature: string,
+): Promise<void> {
+  try {
+    await prisma.token.update({
+      where: { mint: tokenMint },
+      data: {
+        graduated: true,
+        dexMigrated: true,
+        raydiumPool: poolAddress,
+      },
+    });
+
+    const io = getIo();
+    if (io) {
+      io.to(`token:${tokenMint}`).emit("token:dex_migrated", {
+        tokenMint,
+        pool: poolAddress,
+      });
+      io.emit("token:dex_migrated", { tokenMint, pool: poolAddress });
+    }
+
+    logger.info(
+      `DEX migration recorded: mint=${tokenMint}, pool=${poolAddress}, tx=${signature}`,
+    );
+  } catch (err) {
+    logger.error(`Failed to record DEX migration: mint=${tokenMint}`, err);
+  }
 }
 
 async function handleGraduation(signature: string, logMessages: string[]): Promise<void> {

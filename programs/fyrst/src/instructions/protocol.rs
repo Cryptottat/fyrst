@@ -67,6 +67,17 @@ pub fn claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
     Ok(())
 }
 
+/// Update graduation threshold (authority only)
+pub fn update_graduation_threshold(
+    ctx: Context<UpdateTreasury>,
+    new_threshold: u64,
+) -> Result<()> {
+    let config = &mut ctx.accounts.protocol_config;
+    config.graduation_threshold = new_threshold;
+    msg!("Graduation threshold updated to: {}", new_threshold);
+    Ok(())
+}
+
 /// Graduate a bonding curve when reserve meets threshold
 pub fn graduate(ctx: Context<Graduate>) -> Result<()> {
     let curve = &mut ctx.accounts.bonding_curve;

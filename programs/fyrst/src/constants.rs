@@ -31,8 +31,15 @@ pub const BPS_DENOMINATOR: u64 = 10_000;
 /// Protocol config PDA seed
 pub const PROTOCOL_SEED: &[u8] = b"protocol";
 
-/// Graduation threshold in lamports (85 SOL — pump.fun model)
-pub const GRADUATION_THRESHOLD: u64 = 85_000_000_000;
+/// Graduation threshold in lamports (5 SOL — devnet testing)
+pub const GRADUATION_THRESHOLD: u64 = 5_000_000_000;
 
 /// Token decimals for SPL tokens
 pub const TOKEN_DECIMALS: u8 = 6;
+
+/// Wrapped SOL mint address
+pub const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+/// Raydium CPMM program IDs
+pub const RAYDIUM_CPMM_MAINNET: &str = "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C";
+pub const RAYDIUM_CPMM_DEVNET: &str = "DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb";

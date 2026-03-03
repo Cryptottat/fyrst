@@ -83,8 +83,21 @@ pub mod fyrst {
         instructions::protocol::claim_fees(ctx)
     }
 
+    /// Update graduation threshold (authority only)
+    pub fn update_graduation_threshold(
+        ctx: Context<UpdateTreasury>,
+        new_threshold: u64,
+    ) -> Result<()> {
+        instructions::protocol::update_graduation_threshold(ctx, new_threshold)
+    }
+
     /// Graduate a bonding curve when reserve meets threshold
     pub fn graduate(ctx: Context<Graduate>) -> Result<()> {
         instructions::protocol::graduate(ctx)
+    }
+
+    /// Migrate graduated token to Raydium CPMM DEX (permissionless)
+    pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
+        instructions::graduation::graduate_to_dex(ctx)
     }
 }

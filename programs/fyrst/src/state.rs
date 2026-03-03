@@ -59,6 +59,10 @@ pub struct BondingCurve {
     pub claimed_deployer_fees: u64,
     /// Bump seed for PDA
     pub bump: u8,
+    /// Whether the token has been migrated to Raydium DEX
+    pub dex_migrated: bool,
+    /// Raydium CPMM pool address (set after graduation migration)
+    pub raydium_pool: Pubkey,
 }
 
 impl BondingCurve {
@@ -74,7 +78,9 @@ impl BondingCurve {
         + 8   // max_reserve_reached
         + 8   // total_deployer_fees
         + 8   // claimed_deployer_fees
-        + 1;  // bump
+        + 1   // bump
+        + 1   // dex_migrated
+        + 32; // raydium_pool
 }
 
 /// Protocol configuration (singleton PDA)

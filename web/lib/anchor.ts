@@ -25,6 +25,14 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
 );
 
+const WSOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+
+const RAYDIUM_CPMM_PROGRAM = new PublicKey(
+  process.env.NEXT_PUBLIC_DEVNET !== "false"
+    ? "DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb" // devnet (official)
+    : "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C", // mainnet
+);
+
 export const DEFAULT_BASE_PRICE = new BN(100_000); // 0.0001 SOL
 export const DEFAULT_SLOPE = new BN(10);
 export const TOKEN_DECIMALS = 6;
@@ -494,6 +502,110 @@ export async function initProtocol(
     .rpc();
 }
 
+/** Migrate graduated token to Raydium CPMM DEX (permissionless — 1 TX) */
+export async function graduateToDex(
+  program: FyrstProgram,
+  payer: PublicKey,
+  tokenMint: PublicKey,
+): Promise<string> {
+  const provider = program.provider as AnchorProvider;
+  const [bondingCurve] = getCurvePDA(tokenMint);
+
+  // Curve PDA's token and WSOL ATAs
+  const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
+  const curveWsolAccount = getAssociatedTokenAddressSync(WSOL_MINT, bondingCurve, true);
+
+  // Raydium CPMM account derivations
+  // AMM config: first config PDA (index 0)
+  const [ammConfig] = PublicKey.findProgramAddressSync(
+    [Buffer.from("amm_config"), Buffer.alloc(2)], // index 0
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  // Raydium authority PDA
+  const [raydiumAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vault_and_lp_mint_auth_seed")],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  // Token ordering: token0 < token1 by pubkey bytes
+  const wsolBytes = WSOL_MINT.toBuffer();
+  const tokenBytes = tokenMint.toBuffer();
+  const wsolIsToken0 = Buffer.compare(wsolBytes, tokenBytes) < 0;
+  const token0Mint = wsolIsToken0 ? WSOL_MINT : tokenMint;
+  const token1Mint = wsolIsToken0 ? tokenMint : WSOL_MINT;
+
+  // Pool state PDA
+  const [poolState] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool"), ammConfig.toBuffer(), token0Mint.toBuffer(), token1Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  // LP mint PDA
+  const [lpMint] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_lp_mint"), poolState.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  // Token vaults
+  const [token0Vault] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_vault"), poolState.toBuffer(), token0Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+  const [token1Vault] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_vault"), poolState.toBuffer(), token1Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  // Observation state PDA
+  const [observationState] = PublicKey.findProgramAddressSync(
+    [Buffer.from("observation"), poolState.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  // Create pool fee receiver (Raydium-owned)
+  const [createPoolFee] = PublicKey.findProgramAddressSync(
+    [Buffer.from("create_pool_fee"), poolState.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  // LP token account for curve PDA
+  const creatorLpToken = getAssociatedTokenAddressSync(lpMint, bondingCurve, true);
+
+  const methods = program.methods as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+  const ix = await methods
+    .graduateToDex()
+    .accounts({
+      payer,
+      bondingCurve,
+      tokenMint,
+      wsolMint: WSOL_MINT,
+      curveTokenAccount,
+      curveWsolAccount,
+      cpSwapProgram: RAYDIUM_CPMM_PROGRAM,
+      ammConfig,
+      raydiumAuthority,
+      poolState,
+      token0Vault,
+      token1Vault,
+      createPoolFee,
+      lpMint,
+      creatorLpToken,
+      observationState,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY,
+    })
+    .instruction();
+
+  const tx = new Transaction()
+    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }))
+    .add(ix);
+  return await provider.sendAndConfirm(tx, []);
+}
+
 // ---------------------------------------------------------------------------
 // On-chain Data Types & Fetchers
 // ---------------------------------------------------------------------------
@@ -510,6 +622,8 @@ export interface BondingCurveData {
   maxReserveReached: BN;
   totalDeployerFees: BN;
   claimedDeployerFees: BN;
+  dexMigrated: boolean;
+  raydiumPool: PublicKey;
 }
 
 export interface ProtocolConfigData {
