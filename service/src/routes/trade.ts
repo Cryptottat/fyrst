@@ -79,6 +79,16 @@ tradeRouter.post(
 
       // ----- DB mode -----
 
+      // Dedup: if txSignature already recorded (by onchainListener), skip
+      if (clientTxSig) {
+        const existing = await prisma.trade.findFirst({
+          where: { txSignature: clientTxSig },
+        });
+        if (existing) {
+          return res.status(200).json({ success: true, data: existing, deduplicated: true });
+        }
+      }
+
       // Fetch token to get current supply
       const token = await prisma.token.findUnique({
         where: { mint: tokenMint },

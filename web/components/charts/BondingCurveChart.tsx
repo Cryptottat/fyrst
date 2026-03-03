@@ -179,7 +179,7 @@ export default function BondingCurveChart({
     // PRICE mode: raw SOL price
     // MCAP mode: price × supply × solPrice (USD market cap)
     const usdMul = viewMode === "mcap" && solPrice > 0 ? solPrice : 1;
-    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
+    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply : 1;
     const multiplier = supplyMul * usdMul;
 
     if (trades.length === 0) {
@@ -229,7 +229,7 @@ export default function BondingCurveChart({
     }
 
     const usdMul = viewMode === "mcap" && solPrice > 0 ? solPrice : 1;
-    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply / 1e6 : 1;
+    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply : 1;
     const multiplier = supplyMul * usdMul;
 
     import("lightweight-charts").then(({ LineStyle }) => {

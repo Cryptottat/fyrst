@@ -344,7 +344,7 @@ export default function TokenDetailPage({
     setMigrateStatus("loading");
     setTxError(null);
     try {
-      await graduateToDex(program, publicKey, new PublicKey(mint));
+      await graduateToDex(program, publicKey, new PublicKey(mint), curveData!.reserveBalance);
       setMigrateStatus("success");
       await refreshOnChainData();
       setTimeout(() => setMigrateStatus("idle"), 3000);

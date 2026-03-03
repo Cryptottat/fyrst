@@ -27,7 +27,8 @@ export default function LaunchPage() {
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [collateral, setCollateral] = useState(MIN_COLLATERAL);
+  const [collateralInput, setCollateralInput] = useState(String(MIN_COLLATERAL));
+  const collateral = parseFloat(collateralInput) || 0;
   const [durationSeconds, setDurationSeconds] = useState(86_400); // default 24h
   const [initialBuy, setInitialBuy] = useState("");
   const [website, setWebsite] = useState("");
@@ -60,6 +61,11 @@ export default function LaunchPage() {
 
     if (!name.trim() || !symbol.trim()) {
       setError("Name and symbol are required.");
+      return;
+    }
+
+    if (collateral < MIN_COLLATERAL) {
+      setError(`Minimum collateral is ${MIN_COLLATERAL} SOL.`);
       return;
     }
 
@@ -297,14 +303,15 @@ export default function LaunchPage() {
               </label>
               <div className="flex items-center gap-4">
                 <input id="collateral" type="number" min={MIN_COLLATERAL} step="any"
-                  value={collateral} onChange={(e) => setCollateral(Math.max(MIN_COLLATERAL, Number(e.target.value)))}
+                  value={collateralInput} onChange={(e) => setCollateralInput(e.target.value)}
+                  onBlur={() => { if (collateral < MIN_COLLATERAL) setCollateralInput(String(MIN_COLLATERAL)); }}
                   disabled={isProcessing} className={`flex-1 ${inputClass}`} />
                 <Badge label={currentTier} variant="collateral" />
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {COLLATERAL_TIERS.map((tier) => (
-                  <button key={tier.name} type="button" onClick={() => setCollateral(tier.amount)}
+                  <button key={tier.name} type="button" onClick={() => setCollateralInput(String(tier.amount))}
                     disabled={isProcessing}
                     className={`text-[8px] font-display px-3 py-1.5 border-2 transition-colors cursor-pointer disabled:opacity-50 ${
                       currentTier === tier.name

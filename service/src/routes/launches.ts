@@ -37,12 +37,12 @@ launchesRouter.get(
       }
 
       // Build order-by clause
-      type OrderBy = Record<string, "asc" | "desc">;
+      type OrderBy = Record<string, "asc" | "desc" | { sort: "asc" | "desc"; nulls: "first" | "last" }>;
       let orderBy: OrderBy = { createdAt: "desc" };
       if (sort === "marketcap") {
         orderBy = { marketCap: "desc" };
       } else if (sort === "lastTrade") {
-        orderBy = { lastTradeAt: "desc" };
+        orderBy = { lastTradeAt: { sort: "desc", nulls: "last" } };
       }
 
       // When sorting by reputation we sort after fetching (requires join)

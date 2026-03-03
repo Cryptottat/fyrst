@@ -107,6 +107,7 @@ export function formatPrice(price: number): string {
 
 /**
  * Get the collateral tier name from a SOL amount.
+ * Must match COLLATERAL_TIERS in constants.ts.
  */
 export function getCollateralTier(amount: number): string {
   if (amount >= 10) return "Diamond";
