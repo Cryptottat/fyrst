@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import BondingCurveChart from "@/components/charts/BondingCurveChart";
 import type { Candle } from "@/components/charts/BondingCurveChart";
 import { fetchToken, fetchDeployer, fetchTrades, fetchComments, postComment, type ApiToken, type ApiDeployer, type ApiComment } from "@/lib/api";
@@ -94,6 +95,13 @@ export default function TokenDetailPage({
 
   // Claim fees
   const [claimStatus, setClaimStatus] = useState<TxStatus>("idle");
+
+  // Confirm modal
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    rows: { label: string; value: string }[];
+    onConfirm: () => void;
+  } | null>(null);
 
   // Tabs & copy
   const [activeTab, setActiveTab] = useState<"trades" | "comments">("trades");
@@ -371,20 +379,8 @@ export default function TokenDetailPage({
     }
   };
 
-  const handleBuy = async () => {
-    if (!program || !publicKey || !buyAmount) return;
-
-    const solAmount = parseFloat(buyAmount);
-    if (!solAmount || solAmount <= 0) {
-      setTxError("Enter a valid SOL amount");
-      return;
-    }
-
-    // Confirm large trades (> 1 SOL)
-    if (solAmount >= 1 && !window.confirm(
-      `You are about to buy ${solAmount} SOL worth of $${token?.symbol}.\n\nFee: ${(solAmount * 0.01).toFixed(4)} SOL (1%)\nSlippage: ${(slippageBps / 100).toFixed(1)}%\n\nContinue?`
-    )) return;
-
+  const executeBuy = useCallback(async (solAmount: number) => {
+    if (!program || !publicKey) return;
     setBuyStatus("loading");
     setTxError(null);
 
@@ -398,7 +394,6 @@ export default function TokenDetailPage({
         await buyTokens(program, publicKey, mintPubkey, lamports, slippageBps);
       }
 
-      // On-chain succeeded — clear input, refresh data
       setBuyAmount("");
       const freshCurve = await fetchBondingCurve(program, mintPubkey);
       if (freshCurve) setCurveData(freshCurve);
@@ -409,28 +404,40 @@ export default function TokenDetailPage({
       setBuyStatus("error");
       setTxError(err instanceof Error ? err.message : "Transaction failed");
     }
-  };
+  }, [program, publicKey, mint, curveData?.dexMigrated, slippageBps, refreshTrades]);
 
-  const handleSell = async () => {
-    if (!program || !publicKey || !sellAmount) return;
+  const handleBuy = async () => {
+    if (!program || !publicKey || !buyAmount) return;
 
-    const wholeTokens = parseFloat(sellAmount);
-    if (!wholeTokens || wholeTokens <= 0) {
-      setTxError("Enter a valid token amount");
+    const solAmount = parseFloat(buyAmount);
+    if (!solAmount || solAmount <= 0) {
+      setTxError("Enter a valid SOL amount");
       return;
     }
 
-    // Confirm large sells (> 50% of balance or > 1 SOL equivalent)
-    const estimatedSolValue = wholeTokens * displayPrice;
-    if (estimatedSolValue >= 1 && !window.confirm(
-      `You are about to sell ${wholeTokens.toLocaleString()} $${token?.symbol} (~${estimatedSolValue.toFixed(4)} SOL).\n\nFee: ${(estimatedSolValue * 0.01).toFixed(4)} SOL (1%)\nSlippage: ${(slippageBps / 100).toFixed(1)}%\n\nContinue?`
-    )) return;
+    if (solAmount >= 1) {
+      setConfirmModal({
+        title: "CONFIRM BUY",
+        rows: [
+          { label: "TOKEN", value: `$${token?.symbol}` },
+          { label: "AMOUNT", value: `${solAmount} SOL` },
+          { label: "FEE (1%)", value: `${(solAmount * 0.01).toFixed(4)} SOL` },
+          { label: "SLIPPAGE", value: `${(slippageBps / 100).toFixed(1)}%` },
+        ],
+        onConfirm: () => { setConfirmModal(null); executeBuy(solAmount); },
+      });
+      return;
+    }
 
+    executeBuy(solAmount);
+  };
+
+  const executeSell = useCallback(async (wholeTokens: number) => {
+    if (!program || !publicKey) return;
     setSellStatus("loading");
     setTxError(null);
 
     try {
-      // Convert whole tokens → atomic units (6 decimals)
       const atomicAmount = Math.floor(wholeTokens * 10 ** TOKEN_DECIMALS);
       const mintPubkey = new PublicKey(mint);
 
@@ -440,7 +447,6 @@ export default function TokenDetailPage({
         await sellTokens(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
       }
 
-      // On-chain succeeded — clear input, refresh data
       setSellAmount("");
       const freshCurve = await fetchBondingCurve(program, mintPubkey);
       setCurveData(freshCurve);
@@ -451,6 +457,34 @@ export default function TokenDetailPage({
       setSellStatus("error");
       setTxError(err instanceof Error ? err.message : "Transaction failed");
     }
+  }, [program, publicKey, mint, curveData?.dexMigrated, slippageBps, refreshTrades]);
+
+  const handleSell = async () => {
+    if (!program || !publicKey || !sellAmount) return;
+
+    const wholeTokens = parseFloat(sellAmount);
+    if (!wholeTokens || wholeTokens <= 0) {
+      setTxError("Enter a valid token amount");
+      return;
+    }
+
+    const estimatedSolValue = wholeTokens * displayPrice;
+    if (estimatedSolValue >= 1) {
+      setConfirmModal({
+        title: "CONFIRM SELL",
+        rows: [
+          { label: "TOKEN", value: `$${token?.symbol}` },
+          { label: "AMOUNT", value: `${wholeTokens.toLocaleString()} tokens` },
+          { label: "EST. VALUE", value: `~${estimatedSolValue.toFixed(4)} SOL` },
+          { label: "FEE (1%)", value: `${(estimatedSolValue * 0.01).toFixed(4)} SOL` },
+          { label: "SLIPPAGE", value: `${(slippageBps / 100).toFixed(1)}%` },
+        ],
+        onConfirm: () => { setConfirmModal(null); executeSell(wholeTokens); },
+      });
+      return;
+    }
+
+    executeSell(wholeTokens);
   };
 
   const handleClaimFees = async () => {
@@ -1149,6 +1183,14 @@ export default function TokenDetailPage({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmModal !== null}
+        title={confirmModal?.title ?? ""}
+        rows={confirmModal?.rows ?? []}
+        onConfirm={() => confirmModal?.onConfirm()}
+        onCancel={() => setConfirmModal(null)}
+      />
     </main>
   );
 }
