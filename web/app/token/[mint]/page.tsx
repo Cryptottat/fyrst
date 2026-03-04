@@ -304,16 +304,20 @@ export default function TokenDetailPage({
     refreshOnChainData();
   }, [refreshOnChainData]);
 
-  // Auto-transition on DEX migration (cranker completes graduation)
+  // Auto-refresh on-chain data when trades happen or DEX migration completes
   useEffect(() => {
     const socket = getSocket();
-    const handleDexMigrated = (data: { tokenMint: string }) => {
+    const handleRefresh = (data: { tokenMint: string }) => {
       if (data.tokenMint === mint) {
         refreshOnChainData();
       }
     };
-    socket.on("token:dex_migrated", handleDexMigrated);
-    return () => { socket.off("token:dex_migrated", handleDexMigrated); };
+    socket.on("trade:executed", handleRefresh);
+    socket.on("token:dex_migrated", handleRefresh);
+    return () => {
+      socket.off("trade:executed", handleRefresh);
+      socket.off("token:dex_migrated", handleRefresh);
+    };
   }, [mint, refreshOnChainData]);
 
   // Fetch actual SPL token balance from ATA
