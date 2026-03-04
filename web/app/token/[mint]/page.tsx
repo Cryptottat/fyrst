@@ -42,7 +42,7 @@ import {
   getReputationGrade,
   fetchSolPrice,
 } from "@/lib/utils";
-import { Loader2, Globe, ExternalLink, Copy, Check } from "lucide-react";
+import { Loader2, Globe, ExternalLink, Copy, Check, ChevronDown, TrendingUp, Shield, GraduationCap, Percent, ShieldAlert, Star } from "lucide-react";
 
 type TxStatus = "idle" | "loading" | "success" | "error";
 
@@ -1201,6 +1201,71 @@ export default function TokenDetailPage({
           </div>
         </div>
       </div>
+
+      {/* How it Works — collapsible */}
+      <details className="group mt-6">
+        <summary className="flex items-center justify-between cursor-pointer list-none px-4 py-3 bg-bg-card arcade-border hover:border-primary transition-colors">
+          <span className="text-[10px] font-display tracking-wider text-text-muted group-open:text-primary transition-colors">
+            HOW IT WORKS
+          </span>
+          <ChevronDown className="w-4 h-4 text-text-muted group-open:rotate-180 transition-transform duration-200" />
+        </summary>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+          {[
+            {
+              icon: TrendingUp,
+              title: "BONDING CURVE",
+              desc: "Price rises on buy, drops on sell. Fair and transparent price discovery for every token.",
+              color: "text-primary",
+            },
+            {
+              icon: Shield,
+              title: "COLLATERAL",
+              desc: "Deployers must lock collateral. Bronze / Silver / Gold tiers signal commitment level.",
+              color: "text-accent",
+            },
+            {
+              icon: GraduationCap,
+              title: "GRADUATION",
+              desc: "When reserve hits threshold, token auto-lists on Raydium CPMM DEX. LP locked forever.",
+              color: "text-success",
+            },
+            {
+              icon: Percent,
+              title: "FEES",
+              desc: "1% fee on every buy & sell. A portion is distributed back to the deployer.",
+              color: "text-primary",
+            },
+            {
+              icon: ShieldAlert,
+              title: "RUG PROTECTION",
+              desc: "If a deployer rug-pulls, collateral is auto-refunded to investors.",
+              color: "text-error",
+            },
+            {
+              icon: Star,
+              title: "REPUTATION",
+              desc: "Cross-wallet history tracking for deployers. Trust grades at a glance.",
+              color: "text-accent",
+            },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className="bg-bg-card arcade-border p-4 flex gap-3 items-start hover:border-primary/50 transition-colors"
+            >
+              <item.icon className={`w-4 h-4 mt-0.5 shrink-0 ${item.color}`} />
+              <div>
+                <h4 className="text-[9px] font-display tracking-wider text-text-primary mb-1">
+                  {item.title}
+                </h4>
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
 
       <ConfirmModal
         open={confirmModal !== null}

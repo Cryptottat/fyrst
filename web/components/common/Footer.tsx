@@ -5,6 +5,7 @@ import Link from "next/link";
 const footerLinks = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Launch", href: "/launch" },
+  { label: "About", href: "/about" },
   { label: "Docs", href: "https://github.com/fyrst-fun/fyrst#readme" },
 ];
 

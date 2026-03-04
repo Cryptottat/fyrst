@@ -12,6 +12,7 @@ const navLinks = [
   { label: "LAUNCH", href: "/launch" },
   { label: "BOUNTY", href: "/bounty" },
   { label: "PORTFOLIO", href: "/portfolio" },
+  { label: "ABOUT", href: "/about" },
 ];
 
 export default function Header() {
