@@ -77,6 +77,7 @@ export default function TokenDetailPage({
   const [deployer, setDeployer] = useState<ApiDeployer | null>(null);
   const [curveData, setCurveData] = useState<BondingCurveData | null>(null);
   const [splBalance, setSplBalance] = useState(0); // whole tokens (ui amount)
+  const [solBalance, setSolBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -329,6 +330,14 @@ export default function TokenDetailPage({
       setSplBalance(0);
     }
   }, [publicKey, connection, mint, buyStatus, sellStatus]);
+
+  // Fetch SOL balance
+  useEffect(() => {
+    if (!publicKey || !connection) { setSolBalance(null); return; }
+    connection.getBalance(publicKey)
+      .then((lamports) => setSolBalance(lamports / 1e9))
+      .catch(() => setSolBalance(null));
+  }, [publicKey, connection, buyStatus, sellStatus]);
 
   // Price calculation (normalized to match on-chain)
   const onChainPrice = curveData
@@ -996,7 +1005,14 @@ export default function TokenDetailPage({
               {curveData?.dexMigrated && (
                 <p className="text-[8px] text-accent font-mono mb-2">Trading via Raydium DEX</p>
               )}
-              <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">BUY</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[8px] font-display text-text-muted tracking-wider">BUY</h3>
+                {connected && solBalance !== null && (
+                  <span className="text-[9px] font-mono text-text-muted">
+                    Balance: <span className="text-text-primary">{solBalance.toFixed(4)}</span> SOL
+                  </span>
+                )}
+              </div>
               <div className="space-y-3">
                 <div>
                   <label className="text-[8px] font-display text-text-secondary mb-2 block tracking-wider">
