@@ -83,7 +83,7 @@ export default function BondingCurveChart({
 
   const [chartReady, setChartReady] = useState(false);
   const [intervalIdx, setIntervalIdx] = useState(0); // default 1s
-  const [viewMode, setViewMode] = useState<"price" | "mcap">("price");
+  const [viewMode, setViewMode] = useState<"price" | "mcap" | "pmcap">("pmcap");
 
   // -----------------------------------------------------------------------
   // Chart lifecycle — cancelled flag prevents double-creation in strict mode
@@ -181,8 +181,9 @@ export default function BondingCurveChart({
     const interval = INTERVALS[intervalIdx].ms;
     // PRICE mode: raw SOL price
     // MCAP mode: price × supply × solPrice (USD market cap)
-    const usdMul = viewMode === "mcap" && solPrice > 0 ? solPrice : 1;
-    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply : 1;
+    // P-MCAP mode: price × 1B × solPrice (pump.fun standard)
+    const usdMul = (viewMode === "mcap" || viewMode === "pmcap") && solPrice > 0 ? solPrice : 1;
+    const supplyMul = viewMode === "pmcap" ? 1_000_000_000 : viewMode === "mcap" && totalSupply ? totalSupply : 1;
     const multiplier = supplyMul * usdMul;
 
     if (externalCandles && externalCandles.length > 0) {
@@ -242,8 +243,8 @@ export default function BondingCurveChart({
       }
     }
 
-    const usdMul = viewMode === "mcap" && solPrice > 0 ? solPrice : 1;
-    const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply : 1;
+    const usdMul = (viewMode === "mcap" || viewMode === "pmcap") && solPrice > 0 ? solPrice : 1;
+    const supplyMul = viewMode === "pmcap" ? 1_000_000_000 : viewMode === "mcap" && totalSupply ? totalSupply : 1;
     const multiplier = supplyMul * usdMul;
 
     import("lightweight-charts").then(({ LineStyle }) => {
@@ -265,7 +266,7 @@ export default function BondingCurveChart({
   useEffect(() => {
     if (!chartReady || !seriesRef.current) return;
     const series = seriesRef.current as import("lightweight-charts").ISeriesApi<"Candlestick">;
-    if (viewMode === "mcap") {
+    if (viewMode === "mcap" || viewMode === "pmcap") {
       series.applyOptions({
         priceFormat: {
           type: "custom",
@@ -309,6 +310,12 @@ export default function BondingCurveChart({
           ))}
         </div>
         <div className="ml-auto flex gap-1">
+          <button
+            onClick={() => setViewMode("pmcap")}
+            className={btnClass(viewMode === "pmcap")}
+          >
+            P-MCAP $
+          </button>
           <button
             onClick={() => setViewMode("price")}
             className={btnClass(viewMode === "price")}
