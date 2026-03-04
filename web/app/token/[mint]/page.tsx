@@ -1158,23 +1158,29 @@ export default function TokenDetailPage({
                           {formatSol(claimableFeesLamports / 1e9)} SOL
                         </span>
                       </div>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="w-full"
-                        onClick={handleClaimFees}
-                        disabled={claimStatus === "loading"}
-                      >
-                        {claimStatus === "loading" ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <Loader2 className="w-3 h-3 animate-spin" /> CLAIMING...
-                          </span>
-                        ) : claimStatus === "success" ? (
-                          "CLAIMED!"
-                        ) : (
-                          "[ CLAIM FEES ]"
-                        )}
-                      </Button>
+                      {isDexMode ? (
+                        <p className="text-[9px] text-text-muted font-mono">
+                          Fees settled at graduation.
+                        </p>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleClaimFees}
+                          disabled={claimStatus === "loading"}
+                        >
+                          {claimStatus === "loading" ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <Loader2 className="w-3 h-3 animate-spin" /> CLAIMING...
+                            </span>
+                          ) : claimStatus === "success" ? (
+                            "CLAIMED!"
+                          ) : (
+                            "[ CLAIM FEES ]"
+                          )}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
