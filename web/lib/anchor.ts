@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, ComputeBudgetProgram } from "@solana/web3.js";
+import { PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, ComputeBudgetProgram, Connection } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
@@ -626,7 +626,7 @@ export async function graduateToDex(
 // ---------------------------------------------------------------------------
 
 /** Derive all Raydium CPMM accounts for a given token mint */
-function deriveRaydiumAccounts(tokenMint: PublicKey) {
+export function deriveRaydiumAccounts(tokenMint: PublicKey) {
   const [ammConfig] = PublicKey.findProgramAddressSync(
     [Buffer.from("amm_config"), Buffer.alloc(2)],
     RAYDIUM_CPMM_PROGRAM,
@@ -804,6 +804,47 @@ export async function raydiumSell(
   tx.add(createCloseAccountInstruction(sellerWsolAta, seller, seller));
 
   return await provider.sendAndConfirm(tx, []);
+}
+
+// ---------------------------------------------------------------------------
+// Raydium Pool Price (on-chain vault balance ratio)
+// ---------------------------------------------------------------------------
+
+export interface RaydiumPoolPrice {
+  price: number;       // SOL per token
+  wsolReserve: number; // SOL in pool
+  tokenReserve: number; // tokens in pool
+}
+
+/** Fetch current Raydium CPMM pool price from vault balances */
+export async function fetchRaydiumPoolPrice(
+  connection: Connection,
+  tokenMint: PublicKey,
+): Promise<RaydiumPoolPrice | null> {
+  try {
+    const { token0Vault, token1Vault, wsolIsToken0 } = deriveRaydiumAccounts(tokenMint);
+
+    const wsolVault = wsolIsToken0 ? token0Vault : token1Vault;
+    const tokenVault = wsolIsToken0 ? token1Vault : token0Vault;
+
+    const [wsolInfo, tokenInfo] = await Promise.all([
+      connection.getTokenAccountBalance(wsolVault),
+      connection.getTokenAccountBalance(tokenVault),
+    ]);
+
+    const wsolReserve = wsolInfo.value.uiAmount ?? 0;
+    const tokenReserve = tokenInfo.value.uiAmount ?? 0;
+
+    if (tokenReserve === 0) return null;
+
+    return {
+      price: wsolReserve / tokenReserve,
+      wsolReserve,
+      tokenReserve,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

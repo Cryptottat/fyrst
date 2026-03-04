@@ -3,19 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import type { ApiTrade } from "@/lib/api";
 
-interface BondingCurveChartProps {
-  trades: ApiTrade[];
-  currentPrice: number;
-  totalSupply?: number;
-  solPrice?: number;
-}
-
-interface Candle {
+export interface Candle {
   time: number;
   open: number;
   high: number;
   low: number;
   close: number;
+}
+
+interface BondingCurveChartProps {
+  trades: ApiTrade[];
+  currentPrice: number;
+  totalSupply?: number;
+  solPrice?: number;
+  externalCandles?: Candle[];
 }
 
 const INTERVALS = [
@@ -70,6 +71,7 @@ export default function BondingCurveChart({
   currentPrice,
   totalSupply,
   solPrice = 0,
+  externalCandles,
 }: BondingCurveChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<
@@ -182,7 +184,18 @@ export default function BondingCurveChart({
     const supplyMul = viewMode === "mcap" && totalSupply ? totalSupply : 1;
     const multiplier = supplyMul * usdMul;
 
-    if (trades.length === 0) {
+    if (externalCandles && externalCandles.length > 0) {
+      // Use externally provided candles (DEX mode)
+      series.setData(
+        externalCandles.map((c) => ({
+          time: c.time as import("lightweight-charts").UTCTimestamp,
+          open: c.open * multiplier,
+          high: c.high * multiplier,
+          low: c.low * multiplier,
+          close: c.close * multiplier,
+        })),
+      );
+    } else if (trades.length === 0) {
       // No trades yet — show single candle at current base price
       if (currentPrice > 0) {
         const val = currentPrice * multiplier;
@@ -207,7 +220,7 @@ export default function BondingCurveChart({
     }
 
     chartRef.current?.timeScale().fitContent();
-  }, [trades, currentPrice, intervalIdx, viewMode, totalSupply, solPrice, chartReady]);
+  }, [trades, currentPrice, intervalIdx, viewMode, totalSupply, solPrice, chartReady, externalCandles]);
 
   // -----------------------------------------------------------------------
   // Price line

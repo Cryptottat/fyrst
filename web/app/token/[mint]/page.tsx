@@ -7,7 +7,10 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
 import BondingCurveChart from "@/components/charts/BondingCurveChart";
+import type { Candle } from "@/components/charts/BondingCurveChart";
 import { fetchToken, fetchDeployer, fetchTrades, fetchComments, postComment, type ApiToken, type ApiDeployer, type ApiComment } from "@/lib/api";
+import { useRaydiumPrice } from "@/hooks/useRaydiumPrice";
+import { fetchGeckoOHLCV, fetchGeckoTrades, type DexCandle, type DexTrade } from "@/lib/raydium-data";
 import { useAppStore } from "@/lib/store";
 import { useTokenSubscription } from "@/hooks/useSocket";
 import { getSocket } from "@/lib/socket";
@@ -116,6 +119,118 @@ export default function TokenDetailPage({
       .catch(() => { /* silent */ });
   }, [solPrice, setSolPrice]);
 
+  // ---------------------------------------------------------------------------
+  // DEX mode: Raydium price polling + GeckoTerminal data
+  // ---------------------------------------------------------------------------
+  const isDexMode = curveData?.dexMigrated === true;
+  const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
+
+  const { raydiumPrice, wsolReserve, priceHistory } = useRaydiumPrice({
+    connection,
+    tokenMint: mint,
+    enabled: isDexMode,
+    intervalMs: 5_000,
+  });
+
+  // GeckoTerminal candles + trades (mainnet only, 30s polling)
+  const [dexCandles, setDexCandles] = useState<DexCandle[]>([]);
+  const [dexTrades, setDexTrades] = useState<DexTrade[]>([]);
+
+  // Raydium pool address for GeckoTerminal queries
+  const raydiumPoolAddress = useMemo(() => {
+    if (!isDexMode || !curveData?.raydiumPool) return null;
+    try {
+      return curveData.raydiumPool.toBase58();
+    } catch { return null; }
+  }, [isDexMode, curveData?.raydiumPool]);
+
+  useEffect(() => {
+    if (!isDexMode || isDevnet || !raydiumPoolAddress) return;
+    let cancelled = false;
+
+    const fetchDex = async () => {
+      const [candles, trades] = await Promise.all([
+        fetchGeckoOHLCV(raydiumPoolAddress, "1m", 100),
+        fetchGeckoTrades(raydiumPoolAddress),
+      ]);
+      if (!cancelled) {
+        setDexCandles(candles);
+        setDexTrades(trades);
+      }
+    };
+
+    fetchDex();
+    const timer = setInterval(fetchDex, 30_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [isDexMode, isDevnet, raydiumPoolAddress]);
+
+  // Build external candles for chart: mainnet = GeckoTerminal, devnet = polling history
+  const externalCandles = useMemo<Candle[] | undefined>(() => {
+    if (!isDexMode) return undefined;
+
+    // Mainnet: GeckoTerminal OHLCV
+    if (!isDevnet && dexCandles.length > 0) {
+      return dexCandles.map((c) => ({
+        time: c.time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }));
+    }
+
+    // Devnet: aggregate polling priceHistory into 5-second candles
+    if (priceHistory.length > 0) {
+      const bucketMs = 5_000;
+      const candles: Candle[] = [];
+      let bucket = Math.floor(priceHistory[0].time / (bucketMs / 1000)) * (bucketMs / 1000);
+      let o = priceHistory[0].close, h = o, l = o, c = o;
+
+      for (const p of priceHistory) {
+        const b = Math.floor(p.time / (bucketMs / 1000)) * (bucketMs / 1000);
+        if (b !== bucket) {
+          candles.push({ time: bucket, open: o, high: h, low: l, close: c });
+          bucket = b;
+          o = c;
+          h = Math.max(o, p.close);
+          l = Math.min(o, p.close);
+          c = p.close;
+        } else {
+          h = Math.max(h, p.close);
+          l = Math.min(l, p.close);
+          c = p.close;
+        }
+      }
+      candles.push({ time: bucket, open: o, high: h, low: l, close: c });
+      return candles;
+    }
+
+    return undefined;
+  }, [isDexMode, isDevnet, dexCandles, priceHistory]);
+
+  // Merge store trades + DEX trades (deduplicated by txSignature)
+  const allTrades = useMemo(() => {
+    if (!isDexMode || dexTrades.length === 0) return storeTrades;
+
+    const seen = new Set(storeTrades.map((t) => t.txSignature).filter(Boolean));
+    const merged = [...storeTrades];
+    for (const dt of dexTrades) {
+      if (dt.txSignature && seen.has(dt.txSignature)) continue;
+      merged.push({
+        id: dt.id,
+        tokenMint: mint,
+        traderAddress: dt.traderAddress,
+        side: dt.side,
+        amount: dt.amount,
+        price: dt.price,
+        totalSol: dt.totalSol,
+        txSignature: dt.txSignature,
+        createdAt: dt.createdAt,
+      });
+    }
+    return merged;
+  }, [isDexMode, storeTrades, dexTrades, mint]);
+
   // Derive pool (bonding curve) PDA
   const poolAddress = useMemo(() => {
     try {
@@ -123,9 +238,6 @@ export default function TokenDetailPage({
       return pda.toBase58();
     } catch { return null; }
   }, [mint]);
-
-  // Explorer URL helper — Solana Explorer for devnet, Solscan for mainnet
-  const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
   const explorerUrl = (type: "tx" | "address" | "token", value: string) =>
     isDevnet
       ? `https://explorer.solana.com/${type === "token" ? "address" : type}/${value}?cluster=devnet`
@@ -222,8 +334,10 @@ export default function TokenDetailPage({
     ? curveData.currentSupply.toNumber() / 1e6
     : null;
 
-  // Priority: live socket price > on-chain > API
-  const displayPrice = priceSnapshot?.price ?? onChainPrice ?? token?.currentPrice ?? 0;
+  // Priority: DEX mode → raydium pool price, else socket > on-chain > API
+  const displayPrice = isDexMode
+    ? (raydiumPrice ?? onChainPrice ?? token?.currentPrice ?? 0)
+    : (priceSnapshot?.price ?? onChainPrice ?? token?.currentPrice ?? 0);
   const displaySupply = priceSnapshot?.supply ?? onChainSupply ?? token?.totalSupply ?? 0;
 
   const refreshTrades = useCallback(async () => {
@@ -542,10 +656,11 @@ export default function TokenDetailPage({
             <Card padding="lg">
               <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">PRICE CHART</h3>
               <BondingCurveChart
-                trades={storeTrades}
+                trades={allTrades}
                 currentPrice={displayPrice}
                 totalSupply={displaySupply}
                 solPrice={solPrice}
+                externalCandles={externalCandles}
               />
             </Card>
 
@@ -565,11 +680,15 @@ export default function TokenDetailPage({
                 </p>
               </Card>
               <Card padding="sm">
-                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">RESERVE</p>
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">
+                  {isDexMode ? "LIQUIDITY" : "RESERVE"}
+                </p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
-                  {curveData
-                    ? formatSol(curveData.reserveBalance.toNumber() / 1e9)
-                    : "\u2014"}
+                  {isDexMode && wsolReserve !== null
+                    ? formatSol(wsolReserve)
+                    : curveData
+                      ? formatSol(curveData.reserveBalance.toNumber() / 1e9)
+                      : "\u2014"}
                 </p>
               </Card>
               <Card padding="sm">
@@ -651,7 +770,7 @@ export default function TokenDetailPage({
                       : "text-text-muted hover:text-text-secondary"
                   }`}
                 >
-                  TRADES ({storeTrades.length})
+                  TRADES ({allTrades.length})
                 </button>
                 <button
                   type="button"
@@ -668,7 +787,7 @@ export default function TokenDetailPage({
 
               {activeTab === "trades" ? (
                 <div className="max-h-96 overflow-y-auto">
-                  {storeTrades.length > 0 ? (
+                  {allTrades.length > 0 ? (
                     <table className="w-full text-[9px] font-mono">
                       <thead>
                         <tr className="text-text-muted text-left border-b border-border">
@@ -680,7 +799,7 @@ export default function TokenDetailPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {[...storeTrades].reverse().map((t) => (
+                        {[...allTrades].reverse().map((t) => (
                           <tr key={t.id || t.txSignature} className="border-b border-border/30 hover:bg-primary/5">
                             <td className="py-2">
                               <span className={`font-display ${t.side === "buy" ? "text-success" : "text-error"}`}>
