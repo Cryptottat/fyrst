@@ -103,7 +103,7 @@ describe("FYRST v13 E2E Tests", () => {
     assert.equal(config.treasury.toBase58(), treasury.publicKey.toBase58());
     assert.equal(
       config.graduationThreshold.toNumber(),
-      85_000_000_000
+      5_000_000_000
     );
 
     console.log("  Protocol initialized: authority + treasury set");
@@ -385,7 +385,7 @@ describe("FYRST v13 E2E Tests", () => {
     const expectedUnlocked = Math.floor(
       (curveBefore.totalDeployerFees.toNumber() *
         curveBefore.maxReserveReached.toNumber()) /
-        85_000_000_000
+        5_000_000_000
     );
 
     console.log(

@@ -331,8 +331,9 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
 /// Uses integral pricing to ensure reserve solvency.
 pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64) -> Result<()> {
     let mut net_sol;
-    let trade_fee_sell;
-    let protocol_fee_sell;
+    let mut trade_fee_sell;
+    let mut protocol_fee_sell;
+    let mut gross_sol_final;
     {
         let curve = &ctx.accounts.bonding_curve;
 
@@ -374,9 +375,17 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
             .checked_sub(protocol_fee_sell)
             .ok_or(FyrstError::MathOverflow)?;
 
-        // Cap at reserve balance to handle integer rounding when selling 100%
-        if net_sol > curve.reserve_balance {
-            net_sol = curve.reserve_balance;
+        // Cap gross at reserve (not just net) — reserve must cover payout + fees
+        gross_sol_final = gross_sol;
+        if gross_sol_final > curve.reserve_balance {
+            gross_sol_final = curve.reserve_balance;
+            trade_fee_sell = gross_sol_final
+                .checked_mul(TRADE_FEE_BPS).ok_or(FyrstError::MathOverflow)?
+                .checked_div(BPS_DENOMINATOR).ok_or(FyrstError::MathOverflow)?;
+            protocol_fee_sell = 0;
+            net_sol = gross_sol_final
+                .checked_sub(trade_fee_sell).ok_or(FyrstError::MathOverflow)?
+                .checked_sub(protocol_fee_sell).ok_or(FyrstError::MathOverflow)?;
         }
 
         require!(net_sol >= min_sol_out, FyrstError::SlippageExceeded);
@@ -418,7 +427,7 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
         .ok_or(FyrstError::MathOverflow)?;
     curve.reserve_balance = curve
         .reserve_balance
-        .checked_sub(net_sol)
+        .checked_sub(gross_sol_final)
         .ok_or(FyrstError::MathOverflow)?;
     curve.total_deployer_fees = curve
         .total_deployer_fees
