@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiTrade } from "@/lib/api";
+import { formatCompact } from "@/lib/utils";
 
 export interface Candle {
   time: number;
@@ -257,6 +258,31 @@ export default function BondingCurveChart({
       priceLineRef.current = line;
     });
   }, [currentPrice, viewMode, totalSupply, solPrice, chartReady]);
+
+  // -----------------------------------------------------------------------
+  // Update price format when view mode changes
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (!chartReady || !seriesRef.current) return;
+    const series = seriesRef.current as import("lightweight-charts").ISeriesApi<"Candlestick">;
+    if (viewMode === "mcap") {
+      series.applyOptions({
+        priceFormat: {
+          type: "custom",
+          formatter: (price: number) => `$${formatCompact(price)}`,
+          minMove: 0.01,
+        },
+      });
+    } else {
+      series.applyOptions({
+        priceFormat: {
+          type: "price",
+          precision: 8,
+          minMove: 0.00000001,
+        },
+      });
+    }
+  }, [viewMode, chartReady]);
 
   // -----------------------------------------------------------------------
   // UI

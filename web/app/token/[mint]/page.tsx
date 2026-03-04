@@ -721,7 +721,9 @@ export default function TokenDetailPage({
                 </p>
               </Card>
               <Card padding="sm">
-                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">MCAP (USD)</p>
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">
+                  {solPrice > 0 ? "MCAP (USD)" : "MCAP (SOL)"}
+                </p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
                   {solPrice > 0
                     ? `$${formatCompact(displayPrice * displaySupply * solPrice)}`
