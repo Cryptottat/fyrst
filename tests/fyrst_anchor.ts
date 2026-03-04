@@ -178,7 +178,7 @@ describe("FYRST v13 E2E Tests", () => {
 
   // ─── 4. Reject Invalid Duration ──────────────────────────────────
 
-  it("4. Reject escrow with invalid duration (< 1h)", async () => {
+  it("4. Reject escrow with invalid duration (< 1min)", async () => {
     const badMint = Keypair.generate();
     const [badEscrow] = PublicKey.findProgramAddressSync(
       [
@@ -193,7 +193,7 @@ describe("FYRST v13 E2E Tests", () => {
       await (program.methods as any)
         .createEscrow(
           new anchor.BN(0.1 * LAMPORTS_PER_SOL),
-          new anchor.BN(1800) // 30 minutes — too short
+          new anchor.BN(30) // 30 seconds — too short
         )
         .accounts({
           deployer: deployer.publicKey,
@@ -205,7 +205,7 @@ describe("FYRST v13 E2E Tests", () => {
       assert.fail("Should have thrown InvalidDuration");
     } catch (err: any) {
       assert.include(err.toString(), "InvalidDuration");
-      console.log("  Correctly rejected: 1800s < 3600s minimum");
+      console.log("  Correctly rejected: 30s < 60s minimum");
     }
   });
 

@@ -69,6 +69,11 @@ export const MIN_COLLATERAL = 0.1;
 
 /** Deadline duration presets (seconds) */
 export const DEADLINE_PRESETS = [
+  { label: "1 MIN", seconds: 60 },
+  { label: "3 MIN", seconds: 180 },
+  { label: "5 MIN", seconds: 300 },
+  { label: "15 MIN", seconds: 900 },
+  { label: "30 MIN", seconds: 1_800 },
   { label: "1 HOUR", seconds: 3_600 },
   { label: "6 HOURS", seconds: 21_600 },
   { label: "12 HOURS", seconds: 43_200 },

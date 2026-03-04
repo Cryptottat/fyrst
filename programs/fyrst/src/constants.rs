@@ -1,8 +1,8 @@
 /// Minimum collateral in lamports (0.1 SOL)
 pub const MIN_COLLATERAL: u64 = 100_000_000;
 
-/// Minimum escrow duration in seconds (1 hour)
-pub const MIN_DURATION: i64 = 3_600;
+/// Minimum escrow duration in seconds (1 minute — devnet testing)
+pub const MIN_DURATION: i64 = 60;
 
 /// Maximum escrow duration in seconds (7 days)
 pub const MAX_DURATION: i64 = 604_800;
