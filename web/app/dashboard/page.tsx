@@ -35,8 +35,8 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
   const tier = token.collateralTier || "Bronze";
   const snapshot: PriceSnapshot | undefined = useAppStore((s) => s.prices.get(token.mint));
   const solPrice = useAppStore((s) => s.solPrice);
-  const liveMcapSol = snapshot?.marketCap ?? token.marketCap;
-  const liveMcap = solPrice > 0 ? liveMcapSol * solPrice : liveMcapSol;
+  const livePrice = snapshot?.price ?? token.currentPrice;
+  const livePmcap = solPrice > 0 ? livePrice * 1_000_000_000 * solPrice : livePrice * 1_000_000_000;
   const liveProgress = snapshot?.bondingCurveProgress ?? token.bondingCurveProgress;
 
   const changePercent =
@@ -94,7 +94,7 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
 
         <div className="flex items-center justify-between text-xs mb-2">
           <div>
-            <span className="text-text-muted font-display text-[8px]">MCap </span>
+            <span className="text-text-muted font-display text-[8px]">P-MCap </span>
             <span
               className={`font-score text-sm neon-text-subtle transition-colors duration-500 ${
                 isRecent && isUp
@@ -104,7 +104,7 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
                     : "text-text-secondary"
               }`}
             >
-              {solPrice > 0 ? `$${formatCompact(liveMcap)}` : `${formatCompact(liveMcapSol)} SOL`}
+              {solPrice > 0 ? `$${formatCompact(livePmcap)}` : `${formatCompact(livePrice * 1_000_000_000)} SOL`}
             </span>
             {changePercent !== 0 && (
               <span
