@@ -662,6 +662,11 @@ function deriveRaydiumAccounts(tokenMint: PublicKey) {
 
 const SWAP_BASE_INPUT_DISCRIMINATOR = Buffer.from([143, 190, 90, 218, 196, 30, 51, 222]);
 
+/** Encode a BN as 8-byte little-endian buffer (browser-safe, no BigInt needed) */
+function bnToU64LE(val: BN): Buffer {
+  return val.toArrayLike(Buffer, "le", 8);
+}
+
 /** Buy token via Raydium CPMM swap (SOL → Token) */
 export async function raydiumBuy(
   program: FyrstProgram,
@@ -696,17 +701,12 @@ export async function raydiumBuy(
   tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: buyerWsolAta, lamports: solLamports.toNumber() }));
   tx.add(createSyncNativeInstruction(buyerWsolAta));
 
-  // min_amount_out with slippage (0 for now — slippage protection via slippageBps)
-  const minAmountOut = new BN(0); // TODO: fetch pool reserves for accurate estimate
-  if (slippageBps < 10000) {
-    // We pass 0 min_amount_out for simplicity; wallet confirmation acts as guard
-  }
-
   // swap_base_input IX data: discriminator(8) + amount_in(8) + min_amount_out(8)
-  const data = Buffer.alloc(24);
-  SWAP_BASE_INPUT_DISCRIMINATOR.copy(data, 0);
-  data.writeBigUInt64LE(BigInt(solLamports.toString()), 8);
-  data.writeBigUInt64LE(BigInt(minAmountOut.toString()), 16);
+  const data = Buffer.concat([
+    SWAP_BASE_INPUT_DISCRIMINATOR,
+    bnToU64LE(solLamports),
+    bnToU64LE(new BN(0)), // min_amount_out
+  ]);
 
   // input = WSOL, output = Token
   const inputAta = buyerWsolAta;
@@ -764,17 +764,12 @@ export async function raydiumSell(
     tx.add(createAssociatedTokenAccountInstruction(seller, sellerWsolAta, seller, WSOL_MINT));
   }
 
-  // min_amount_out = 0 for simplicity
-  const minAmountOut = new BN(0);
-  if (slippageBps < 10000) {
-    // pass
-  }
-
-  // swap_base_input IX data
-  const data = Buffer.alloc(24);
-  SWAP_BASE_INPUT_DISCRIMINATOR.copy(data, 0);
-  data.writeBigUInt64LE(BigInt(tokenAmount.toString()), 8);
-  data.writeBigUInt64LE(BigInt(minAmountOut.toString()), 16);
+  // swap_base_input IX data: discriminator(8) + amount_in(8) + min_amount_out(8)
+  const data = Buffer.concat([
+    SWAP_BASE_INPUT_DISCRIMINATOR,
+    bnToU64LE(tokenAmount),
+    bnToU64LE(new BN(0)), // min_amount_out
+  ]);
 
   // input = Token, output = WSOL
   const inputAta = sellerTokenAta;
