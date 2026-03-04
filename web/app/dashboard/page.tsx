@@ -11,6 +11,7 @@ import {
   formatTimeAgo,
   getReputationGrade,
   formatSol,
+  fetchSolPrice,
 } from "@/lib/utils";
 import { Search, Clock, Shield } from "lucide-react";
 
@@ -149,17 +150,10 @@ export default function DashboardPage() {
   const solPrice = useAppStore((s) => s.solPrice);
   const setSolPrice = useAppStore((s) => s.setSolPrice);
 
-  // Fallback: fetch SOL price if WebSocket hasn't provided it
+  // Fetch SOL price: Jupiter → CoinGecko → Binance → Helius fallback chain
   useEffect(() => {
     if (solPrice > 0) return;
-    const SOL_MINT = "So11111111111111111111111111111111111111112";
-    fetch(`https://api.jup.ag/price/v2?ids=${SOL_MINT}`)
-      .then((r) => r.json())
-      .then((json: { data?: Record<string, { price?: string }> }) => {
-        const p = json?.data?.[SOL_MINT]?.price;
-        if (p) setSolPrice(parseFloat(p));
-      })
-      .catch(() => {});
+    fetchSolPrice().then((p) => { if (p) setSolPrice(p); });
   }, [solPrice, setSolPrice]);
 
   useEffect(() => {
