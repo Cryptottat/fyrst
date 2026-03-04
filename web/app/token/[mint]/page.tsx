@@ -707,25 +707,7 @@ export default function TokenDetailPage({
               />
             </Card>
 
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-              <Card padding="sm">
-                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider flex items-center gap-1">
-                  P-MCAP (USD)
-                  <span className="relative group cursor-help">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 text-text-muted">
-                      <path fillRule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
-                    </svg>
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-[9px] text-text-primary bg-card-bg border border-white/10 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                      Estimated market cap based on 1B fixed supply (pump.fun standard)
-                    </span>
-                  </span>
-                </p>
-                <p className="text-sm font-score text-text-primary neon-text-subtle">
-                  {solPrice > 0
-                    ? `$${formatCompact(displayPrice * 1_000_000_000 * solPrice)}`
-                    : `${formatCompact(displayPrice * 1_000_000_000)} SOL`}
-                </p>
-              </Card>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Card padding="sm">
                 <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">PRICE (SOL)</p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
