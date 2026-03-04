@@ -50,14 +50,38 @@ export function getSocket(): Socket {
 
 export function subscribeToken(mint: string): void {
   const s = getSocket();
+
+  // Send immediately if already connected
   if (s.connected) {
     s.emit("subscribe:token", mint);
   }
+
+  // Re-subscribe on (re)connect so the room join survives reconnections
+  // and handles the case where the socket wasn't connected yet.
+  const onConnect = () => s.emit("subscribe:token", mint);
+  s.on("connect", onConnect);
+
+  // Store the listener so unsubscribeToken can clean it up
+  if (!subscribeListeners.has(mint)) {
+    subscribeListeners.set(mint, []);
+  }
+  subscribeListeners.get(mint)!.push(onConnect);
 }
+
+const subscribeListeners = new Map<string, Array<() => void>>();
 
 export function unsubscribeToken(mint: string): void {
   const s = getSocket();
   if (s.connected) {
     s.emit("unsubscribe:token", mint);
+  }
+
+  // Clean up reconnect listeners
+  const listeners = subscribeListeners.get(mint);
+  if (listeners) {
+    for (const fn of listeners) {
+      s.off("connect", fn);
+    }
+    subscribeListeners.delete(mint);
   }
 }
