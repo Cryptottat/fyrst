@@ -4,6 +4,7 @@ import { logger } from "../utils/logger";
 import { prisma, dbConnected } from "../lib/prisma";
 import { spotPrice, calculateProgress } from "./bondingCurve";
 import { getIo } from "../socketManager";
+import { executeWithRetry } from "./graduationCranker";
 
 // ---------------------------------------------------------------------------
 // On-chain Event Listener (Section 5 — On-chain Data Sync)
@@ -367,8 +368,18 @@ async function handleDexMigration(
 async function handleGraduation(signature: string, logMessages: string[]): Promise<void> {
   logger.info(`On-chain graduation detected: tx=${signature}`);
 
-  // The graduation happens inside buy_tokens, so we've already
-  // handled it via the trade processing above. This is just a log confirmation.
+  // Extract token mint from the graduation log and trigger auto-graduation
+  const mintMatch = logMessages
+    .find((l) => l.includes("Token auto-graduated:"))
+    ?.match(/mint=(\S+)/);
+
+  if (mintMatch) {
+    // fire-and-forget — cranker handles async, does not block listener
+    executeWithRetry(mintMatch[1]).catch((err) => {
+      logger.error(`Auto-graduation failed for ${mintMatch[1]}`, err);
+    });
+  }
+
   try {
     const io = getIo();
     if (io) {

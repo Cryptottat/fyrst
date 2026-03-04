@@ -9,6 +9,7 @@ import { connectRedis } from "./lib/redis";
 import { initQueues } from "./lib/queues";
 import { startBuyback } from "./services/buyback";
 import { startOnchainListener } from "./services/onchainListener";
+import { initCranker, scanMissedGraduations } from "./services/graduationCranker";
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -99,6 +100,14 @@ async function start(): Promise<void> {
 
   // On-chain event listener — watches FYRST program for trades/graduations
   startOnchainListener();
+
+  // Graduation cranker — auto-migrates graduated tokens to Raydium
+  const crankerReady = initCranker();
+  if (crankerReady) {
+    scanMissedGraduations().catch((err) => {
+      logger.error("Failed to scan missed graduations", err);
+    });
+  }
 
   httpServer.listen(config.port, () => {
     logger.info(`FYRST API server running on port ${config.port}`);

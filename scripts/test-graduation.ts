@@ -62,6 +62,13 @@ async function main() {
   // Raydium CPMM account derivation
   const [ammConfig] = PublicKey.findProgramAddressSync(
     [Buffer.from("amm_config"), Buffer.alloc(2)], RAYDIUM_CPMM);
+
+  // Read pool creation fee from AmmConfig account
+  const ammConfigInfo = await connection.getAccountInfo(ammConfig);
+  if (!ammConfigInfo) { console.log("ERROR: Failed to fetch AmmConfig"); return; }
+  const poolCreationFee = Number(ammConfigInfo.data.readBigUInt64LE(36));
+  const liquiditySol = reserveSol - poolCreationFee;
+  console.log(`Pool creation fee: ${poolCreationFee / 1e9} SOL, liquidity: ${liquiditySol / 1e9} SOL`);
   const [raydiumAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("vault_and_lp_mint_auth_seed")], RAYDIUM_CPMM);
 
@@ -108,12 +115,12 @@ async function main() {
     ));
   }
 
-  // IX 3: Transfer SOL from payer to payer's WSOL ATA
-  console.log(`Transferring ${reserveSol / 1e9} SOL to payer WSOL ATA...`);
+  // IX 3: Transfer liquidity SOL (reserve minus pool fee) to payer's WSOL ATA
+  console.log(`Transferring ${liquiditySol / 1e9} SOL (liquidity) to payer WSOL ATA...`);
   tx.add(SystemProgram.transfer({
     fromPubkey: payer.publicKey,
     toPubkey: payerWsolAccount,
-    lamports: reserveSol,
+    lamports: liquiditySol,
   }));
 
   // IX 4: sync_native to update WSOL balance

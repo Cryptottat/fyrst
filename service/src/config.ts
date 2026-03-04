@@ -41,4 +41,6 @@ export const config = {
   buybackMinSol: parseFloat(process.env.BUYBACK_MIN_SOL || "0.01"),
   // Program
   programId: process.env.PROGRAM_ID || "CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP",
+  // Cranker
+  crankerPrivateKey: process.env.CRANKER_PRIVATE_KEY || "",
 };

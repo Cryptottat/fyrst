@@ -19,7 +19,7 @@ use crate::constants::*;
 ///   IX 0: ComputeBudget (1.4M CU)
 ///   IX 1: Create payer WSOL ATA (if needed)
 ///   IX 2: Create payer token ATA (if needed)
-///   IX 3: SystemProgram::Transfer(payer → payer_wsol_ata, reserve_sol)
+///   IX 3: SystemProgram::Transfer(payer → payer_wsol_ata, liquidity_sol)
 ///   IX 4: SPL Token sync_native(payer_wsol_ata)
 ///   IX 5: This instruction (graduate_to_dex)
 pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
@@ -34,7 +34,19 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
     let token_mint_key = curve.token_mint;
     let curve_bump = curve.bump;
 
-    // 2. Calculate pool tokens: match the bonding curve final price
+    // 2. Read pool creation fee from Raydium AmmConfig account
+    //    Layout: discriminator(8) + bump(1) + disable(1) + index(2)
+    //            + trade_fee(8) + protocol_fee(8) + fund_fee(8) + create_pool_fee(8)
+    let pool_creation_fee = {
+        let config_data = ctx.accounts.amm_config.try_borrow_data()?;
+        let fee_bytes: [u8; 8] = config_data[36..44].try_into().unwrap();
+        u64::from_le_bytes(fee_bytes)
+    };
+    require!(reserve_sol > pool_creation_fee, FyrstError::InsufficientFunds);
+    let liquidity_sol = reserve_sol - pool_creation_fee;
+
+    // 3. Calculate pool tokens from liquidity_sol (reserve minus fee)
+    //    so Raydium pool initial price matches bonding curve final price
     let d = 10u64.pow(TOKEN_DECIMALS as u32) as u128;
     let bp = curve.base_price as u128;
     let sl = curve.slope as u128;
@@ -43,7 +55,7 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
     let spot_price = bp + sl * supply / d;
     require!(spot_price > 0, FyrstError::InvalidPrice);
 
-    let pool_tokens = ((reserve_sol as u128) * d / spot_price) as u64;
+    let pool_tokens = ((liquidity_sol as u128) * d / spot_price) as u64;
     require!(pool_tokens > 0, FyrstError::InvalidPrice);
 
     let seeds = &[
@@ -53,16 +65,16 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
     ];
     let signer_seeds = &[&seeds[..]];
 
-    // Verify payer's WSOL ATA has been pre-funded
+    // Verify payer's WSOL ATA has been pre-funded with liquidity amount
     {
         let wsol_data = ctx.accounts.payer_wsol_account.try_borrow_data()?;
         require!(wsol_data.len() >= 72, FyrstError::EmptyReserve);
         let amount_bytes: [u8; 8] = wsol_data[64..72].try_into().unwrap();
         let wsol_amount = u64::from_le_bytes(amount_bytes);
-        require!(wsol_amount >= reserve_sol, FyrstError::EmptyReserve);
+        require!(wsol_amount >= liquidity_sol, FyrstError::EmptyReserve);
     }
 
-    // 3. Mint pool tokens to PAYER's token ATA (bonding_curve PDA = mint authority)
+    // 4. Mint pool tokens to PAYER's token ATA (bonding_curve PDA = mint authority)
     token::mint_to(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -76,12 +88,13 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
         pool_tokens,
     )?;
 
-    // 4. CPI to Raydium CPMM — initialize pool (payer = creator)
+    // 5. CPI to Raydium CPMM — initialize pool (payer = creator)
+    //    Uses liquidity_sol (reserve minus pool creation fee) — fee paid by payer from reimbursement
     let wsol_mint_key = ctx.accounts.wsol_mint.key();
     let (amount_0, amount_1) = if wsol_mint_key < token_mint_key {
-        (reserve_sol, pool_tokens)
+        (liquidity_sol, pool_tokens)
     } else {
-        (pool_tokens, reserve_sol)
+        (pool_tokens, liquidity_sol)
     };
 
     let mut ix_data = vec![175, 175, 109, 31, 13, 152, 155, 237]; // initialize discriminator
@@ -165,7 +178,7 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
         ],
     )?;
 
-    // 5. Burn all LP tokens (permanent liquidity lock)
+    // 6. Burn all LP tokens (permanent liquidity lock)
     // LP tokens are in payer's LP ATA (created by Raydium). Payer authorizes burn via tx signature.
     {
         let lp_data = ctx.accounts.creator_lp_token.try_borrow_data()?;
@@ -195,7 +208,7 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
         }
     }
 
-    // 6. Revoke mint authority (no more tokens can ever be minted)
+    // 7. Revoke mint authority (no more tokens can ever be minted)
     token::set_authority(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -209,22 +222,23 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
         None,
     )?;
 
-    // 7. Reimburse payer from bonding curve reserve (AFTER all CPIs — no more CPIs follow)
+    // 8. Reimburse payer from bonding curve reserve (AFTER all CPIs — no more CPIs follow)
     **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= reserve_sol;
     **ctx.accounts.payer.to_account_info().try_borrow_mut_lamports()? += reserve_sol;
 
-    // 8. Update state
+    // 9. Update state
     let curve = &mut ctx.accounts.bonding_curve;
     curve.dex_migrated = true;
     curve.raydium_pool = ctx.accounts.pool_state.key();
     curve.reserve_balance = 0;
 
     msg!(
-        "DEX migration: mint={}, pool={}, sol={}, tokens={}",
+        "DEX migration: mint={}, pool={}, sol={}, tokens={}, fee={}",
         token_mint_key,
         ctx.accounts.pool_state.key(),
-        reserve_sol,
-        pool_tokens
+        liquidity_sol,
+        pool_tokens,
+        pool_creation_fee
     );
 
     Ok(())
