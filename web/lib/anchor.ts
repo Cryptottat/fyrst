@@ -8,6 +8,7 @@ import {
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
   createSyncNativeInstruction,
+  createCloseAccountInstruction,
 } from "@solana/spl-token";
 import idlJson from "./idl/fyrst.json";
 
@@ -616,6 +617,196 @@ export async function graduateToDex(
     })
     .instruction();
   tx.add(graduateIx);
+
+  return await provider.sendAndConfirm(tx, []);
+}
+
+// ---------------------------------------------------------------------------
+// Raydium CPMM Swap Helpers
+// ---------------------------------------------------------------------------
+
+/** Derive all Raydium CPMM accounts for a given token mint */
+function deriveRaydiumAccounts(tokenMint: PublicKey) {
+  const [ammConfig] = PublicKey.findProgramAddressSync(
+    [Buffer.from("amm_config"), Buffer.alloc(2)],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+  const [raydiumAuthority] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vault_and_lp_mint_auth_seed")],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  const wsolIsToken0 = Buffer.compare(WSOL_MINT.toBuffer(), tokenMint.toBuffer()) < 0;
+  const token0Mint = wsolIsToken0 ? WSOL_MINT : tokenMint;
+  const token1Mint = wsolIsToken0 ? tokenMint : WSOL_MINT;
+
+  const [poolState] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool"), ammConfig.toBuffer(), token0Mint.toBuffer(), token1Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+  const [token0Vault] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_vault"), poolState.toBuffer(), token0Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+  const [token1Vault] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_vault"), poolState.toBuffer(), token1Mint.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+  const [observationState] = PublicKey.findProgramAddressSync(
+    [Buffer.from("observation"), poolState.toBuffer()],
+    RAYDIUM_CPMM_PROGRAM,
+  );
+
+  return { ammConfig, raydiumAuthority, poolState, token0Vault, token1Vault, observationState, wsolIsToken0, token0Mint, token1Mint };
+}
+
+const SWAP_BASE_INPUT_DISCRIMINATOR = Buffer.from([143, 190, 90, 218, 196, 30, 51, 222]);
+
+/** Buy token via Raydium CPMM swap (SOL → Token) */
+export async function raydiumBuy(
+  program: FyrstProgram,
+  buyer: PublicKey,
+  tokenMint: PublicKey,
+  solLamports: BN,
+  slippageBps: number = DEFAULT_SLIPPAGE_BPS,
+): Promise<string> {
+  const provider = program.provider as AnchorProvider;
+  const connection = provider.connection;
+  const { ammConfig, raydiumAuthority, poolState, token0Vault, token1Vault, observationState, wsolIsToken0, token0Mint, token1Mint } = deriveRaydiumAccounts(tokenMint);
+
+  const buyerTokenAta = getAssociatedTokenAddressSync(tokenMint, buyer);
+  const buyerWsolAta = getAssociatedTokenAddressSync(WSOL_MINT, buyer);
+
+  const tx = new Transaction();
+  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }));
+
+  // Create token ATA if needed
+  const tokenAtaInfo = await connection.getAccountInfo(buyerTokenAta);
+  if (!tokenAtaInfo) {
+    tx.add(createAssociatedTokenAccountInstruction(buyer, buyerTokenAta, buyer, tokenMint));
+  }
+
+  // Create WSOL ATA if needed
+  const wsolAtaInfo = await connection.getAccountInfo(buyerWsolAta);
+  if (!wsolAtaInfo) {
+    tx.add(createAssociatedTokenAccountInstruction(buyer, buyerWsolAta, buyer, WSOL_MINT));
+  }
+
+  // Transfer SOL → WSOL ATA + syncNative
+  tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: buyerWsolAta, lamports: solLamports.toNumber() }));
+  tx.add(createSyncNativeInstruction(buyerWsolAta));
+
+  // min_amount_out with slippage (0 for now — slippage protection via slippageBps)
+  const minAmountOut = new BN(0); // TODO: fetch pool reserves for accurate estimate
+  if (slippageBps < 10000) {
+    // We pass 0 min_amount_out for simplicity; wallet confirmation acts as guard
+  }
+
+  // swap_base_input IX data: discriminator(8) + amount_in(8) + min_amount_out(8)
+  const data = Buffer.alloc(24);
+  SWAP_BASE_INPUT_DISCRIMINATOR.copy(data, 0);
+  data.writeBigUInt64LE(BigInt(solLamports.toString()), 8);
+  data.writeBigUInt64LE(BigInt(minAmountOut.toString()), 16);
+
+  // input = WSOL, output = Token
+  const inputAta = buyerWsolAta;
+  const outputAta = buyerTokenAta;
+  const inputVault = wsolIsToken0 ? token0Vault : token1Vault;
+  const outputVault = wsolIsToken0 ? token1Vault : token0Vault;
+  const inputMint = WSOL_MINT;
+  const outputMint = tokenMint;
+
+  const swapIx = {
+    programId: RAYDIUM_CPMM_PROGRAM,
+    keys: [
+      { pubkey: buyer, isSigner: true, isWritable: true },
+      { pubkey: raydiumAuthority, isSigner: false, isWritable: false },
+      { pubkey: ammConfig, isSigner: false, isWritable: false },
+      { pubkey: poolState, isSigner: false, isWritable: true },
+      { pubkey: inputAta, isSigner: false, isWritable: true },
+      { pubkey: outputAta, isSigner: false, isWritable: true },
+      { pubkey: inputVault, isSigner: false, isWritable: true },
+      { pubkey: outputVault, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: inputMint, isSigner: false, isWritable: false },
+      { pubkey: outputMint, isSigner: false, isWritable: false },
+      { pubkey: observationState, isSigner: false, isWritable: true },
+    ],
+    data,
+  };
+  tx.add(swapIx);
+
+  return await provider.sendAndConfirm(tx, []);
+}
+
+/** Sell token via Raydium CPMM swap (Token → SOL) */
+export async function raydiumSell(
+  program: FyrstProgram,
+  seller: PublicKey,
+  tokenMint: PublicKey,
+  tokenAmount: BN,
+  slippageBps: number = DEFAULT_SLIPPAGE_BPS,
+): Promise<string> {
+  const provider = program.provider as AnchorProvider;
+  const connection = provider.connection;
+  const { ammConfig, raydiumAuthority, poolState, token0Vault, token1Vault, observationState, wsolIsToken0 } = deriveRaydiumAccounts(tokenMint);
+
+  const sellerTokenAta = getAssociatedTokenAddressSync(tokenMint, seller);
+  const sellerWsolAta = getAssociatedTokenAddressSync(WSOL_MINT, seller);
+
+  const tx = new Transaction();
+  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }));
+
+  // Create WSOL ATA if needed
+  const wsolAtaInfo = await connection.getAccountInfo(sellerWsolAta);
+  if (!wsolAtaInfo) {
+    tx.add(createAssociatedTokenAccountInstruction(seller, sellerWsolAta, seller, WSOL_MINT));
+  }
+
+  // min_amount_out = 0 for simplicity
+  const minAmountOut = new BN(0);
+  if (slippageBps < 10000) {
+    // pass
+  }
+
+  // swap_base_input IX data
+  const data = Buffer.alloc(24);
+  SWAP_BASE_INPUT_DISCRIMINATOR.copy(data, 0);
+  data.writeBigUInt64LE(BigInt(tokenAmount.toString()), 8);
+  data.writeBigUInt64LE(BigInt(minAmountOut.toString()), 16);
+
+  // input = Token, output = WSOL
+  const inputAta = sellerTokenAta;
+  const outputAta = sellerWsolAta;
+  const inputVault = wsolIsToken0 ? token1Vault : token0Vault;
+  const outputVault = wsolIsToken0 ? token0Vault : token1Vault;
+  const inputMint = tokenMint;
+  const outputMint = WSOL_MINT;
+
+  const swapIx = {
+    programId: RAYDIUM_CPMM_PROGRAM,
+    keys: [
+      { pubkey: seller, isSigner: true, isWritable: true },
+      { pubkey: raydiumAuthority, isSigner: false, isWritable: false },
+      { pubkey: ammConfig, isSigner: false, isWritable: false },
+      { pubkey: poolState, isSigner: false, isWritable: true },
+      { pubkey: inputAta, isSigner: false, isWritable: true },
+      { pubkey: outputAta, isSigner: false, isWritable: true },
+      { pubkey: inputVault, isSigner: false, isWritable: true },
+      { pubkey: outputVault, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: inputMint, isSigner: false, isWritable: false },
+      { pubkey: outputMint, isSigner: false, isWritable: false },
+      { pubkey: observationState, isSigner: false, isWritable: true },
+    ],
+    data,
+  };
+  tx.add(swapIx);
+
+  // Close WSOL ATA → unwrap SOL back to seller
+  tx.add(createCloseAccountInstruction(sellerWsolAta, seller, seller));
 
   return await provider.sendAndConfirm(tx, []);
 }

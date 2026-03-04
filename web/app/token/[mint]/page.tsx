@@ -10,12 +10,15 @@ import BondingCurveChart from "@/components/charts/BondingCurveChart";
 import { fetchToken, fetchDeployer, fetchTrades, fetchComments, postComment, type ApiToken, type ApiDeployer, type ApiComment } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { useTokenSubscription } from "@/hooks/useSocket";
+import { getSocket } from "@/lib/socket";
 import {
   useAnchorProgram,
   fetchBondingCurve,
   getCurvePDA,
   buyTokens,
   sellTokens,
+  raydiumBuy,
+  raydiumSell,
   claimFees,
   graduateToDex,
   TOKEN_DECIMALS,
@@ -180,6 +183,18 @@ export default function TokenDetailPage({
     refreshOnChainData();
   }, [refreshOnChainData]);
 
+  // Auto-transition on DEX migration (cranker completes graduation)
+  useEffect(() => {
+    const socket = getSocket();
+    const handleDexMigrated = (data: { tokenMint: string }) => {
+      if (data.tokenMint === mint) {
+        refreshOnChainData();
+      }
+    };
+    socket.on("token:dex_migrated", handleDexMigrated);
+    return () => { socket.off("token:dex_migrated", handleDexMigrated); };
+  }, [mint, refreshOnChainData]);
+
   // Fetch actual SPL token balance from ATA
   useEffect(() => {
     if (!publicKey || !connection) return;
@@ -263,15 +278,17 @@ export default function TokenDetailPage({
       const lamports = new BN(Math.floor(solAmount * 1e9));
       const mintPubkey = new PublicKey(mint);
 
-      await buyTokens(program, publicKey, mintPubkey, lamports, slippageBps);
+      if (curveData?.dexMigrated) {
+        await raydiumBuy(program, publicKey, mintPubkey, lamports, slippageBps);
+      } else {
+        await buyTokens(program, publicKey, mintPubkey, lamports, slippageBps);
+      }
 
       // On-chain succeeded — clear input, refresh data
-      // Trade recording handled by onchainListener (no duplicate POST)
       setBuyAmount("");
       const freshCurve = await fetchBondingCurve(program, mintPubkey);
       if (freshCurve) setCurveData(freshCurve);
       setBuyStatus("success");
-      // Small delay to let onchainListener record the trade
       setTimeout(async () => { await refreshTrades(); }, 2000);
       setTimeout(() => setBuyStatus("idle"), 3000);
     } catch (err: unknown) {
@@ -303,15 +320,17 @@ export default function TokenDetailPage({
       const atomicAmount = Math.floor(wholeTokens * 10 ** TOKEN_DECIMALS);
       const mintPubkey = new PublicKey(mint);
 
-      await sellTokens(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
+      if (curveData?.dexMigrated) {
+        await raydiumSell(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
+      } else {
+        await sellTokens(program, publicKey, mintPubkey, new BN(atomicAmount), slippageBps);
+      }
 
       // On-chain succeeded — clear input, refresh data
-      // Trade recording handled by onchainListener (no duplicate POST)
       setSellAmount("");
       const freshCurve = await fetchBondingCurve(program, mintPubkey);
       setCurveData(freshCurve);
       setSellStatus("success");
-      // Small delay to let onchainListener record the trade
       setTimeout(async () => { await refreshTrades(); }, 2000);
       setTimeout(() => setSellStatus("idle"), 3000);
     } catch (err: unknown) {
@@ -357,6 +376,8 @@ export default function TokenDetailPage({
 
   // Is current wallet the deployer of this token?
   const isDeployer = publicKey && curveData && publicKey.toBase58() === curveData.deployer.toBase58();
+  // Graduated but not yet migrated → disable trading
+  const isMigrating = curveData?.graduated && !curveData?.dexMigrated;
   // Progressive fee unlock: unlocked = (totalDeployerFees * maxReserveReached) / GRADUATION_THRESHOLD
   const GRADUATION_THRESHOLD_LAMPORTS = 5_000_000_000;
   const claimableFeesLamports = (() => {
@@ -604,32 +625,16 @@ export default function TokenDetailPage({
               </Card>
             )}
 
-            {/* Graduated but not yet migrated — show migrate button */}
+            {/* Graduated but not yet migrated — auto-migration in progress */}
             {curveData?.graduated && !curveData?.dexMigrated && (
               <Card padding="lg">
                 <div className="text-center space-y-3">
-                  <p className="text-[10px] font-display text-text-muted tracking-wider">READY FOR DEX MIGRATION</p>
+                  <span className="flex items-center justify-center gap-2 text-[10px] font-display text-primary tracking-wider">
+                    <Loader2 className="w-3 h-3 animate-spin" /> MIGRATING TO RAYDIUM...
+                  </span>
                   <p className="text-xs text-text-secondary font-mono">
-                    Bonding curve is full. Migrate liquidity to Raydium to enable DEX trading.
+                    Auto-migration in progress. Trading will resume shortly on Raydium DEX.
                   </p>
-                  <Button
-                    variant="primary"
-                    className="w-full"
-                    onClick={handleGraduateToDex}
-                    disabled={!connected || migrateStatus === "loading"}
-                  >
-                    {migrateStatus === "loading" ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" /> MIGRATING TO RAYDIUM...
-                      </span>
-                    ) : migrateStatus === "success" ? (
-                      "MIGRATED!"
-                    ) : !connected ? (
-                      "CONNECT WALLET"
-                    ) : (
-                      "[ MIGRATE TO RAYDIUM DEX ]"
-                    )}
-                  </Button>
                 </div>
               </Card>
             )}
@@ -832,7 +837,10 @@ export default function TokenDetailPage({
               )}
             </Card>
 
-            {!curveData?.dexMigrated && (<Card>
+            <Card>
+              {curveData?.dexMigrated && (
+                <p className="text-[8px] text-accent font-mono mb-2">Trading via Raydium DEX</p>
+              )}
               <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">BUY</h3>
               <div className="space-y-3">
                 <div>
@@ -854,9 +862,11 @@ export default function TokenDetailPage({
                   variant="primary"
                   className="w-full"
                   onClick={handleBuy}
-                  disabled={!connected || buyStatus === "loading" || !buyAmount}
+                  disabled={!connected || buyStatus === "loading" || !buyAmount || !!isMigrating}
                 >
-                  {buyStatus === "loading" ? (
+                  {isMigrating ? (
+                    "MIGRATING..."
+                  ) : buyStatus === "loading" ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="w-3 h-3 animate-spin" /> CONFIRMING...
                     </span>
@@ -869,9 +879,12 @@ export default function TokenDetailPage({
                   )}
                 </Button>
               </div>
-            </Card>)}
+            </Card>
 
-            {!curveData?.dexMigrated && (<Card>
+            <Card>
+              {curveData?.dexMigrated && (
+                <p className="text-[8px] text-accent font-mono mb-2">Trading via Raydium DEX</p>
+              )}
               <h3 className="text-[8px] font-display text-text-muted mb-3 tracking-wider">SELL</h3>
               <div className="space-y-3">
                 {connected && splBalance > 0 && (
@@ -919,9 +932,11 @@ export default function TokenDetailPage({
                   variant="outline"
                   className="w-full"
                   onClick={handleSell}
-                  disabled={!connected || sellStatus === "loading" || !sellAmount}
+                  disabled={!connected || sellStatus === "loading" || !sellAmount || !!isMigrating}
                 >
-                  {sellStatus === "loading" ? (
+                  {isMigrating ? (
+                    "MIGRATING..."
+                  ) : sellStatus === "loading" ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="w-3 h-3 animate-spin" /> CONFIRMING...
                     </span>
@@ -934,7 +949,7 @@ export default function TokenDetailPage({
                   )}
                 </Button>
               </div>
-            </Card>)}
+            </Card>
 
             {txError && (
               <Card>
