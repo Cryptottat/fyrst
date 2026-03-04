@@ -393,14 +393,15 @@ export async function sellTokens(
   const ca = curveAccount as BondingCurveData;
 
   // Estimate SOL received using integral pricing (1% total fee)
-  const expectedGross = estimateSellSol(ca.basePrice, ca.slope, ca.currentSupply, tokenAmount);
-  const tradeFee = expectedGross.muln(100).divn(10_000); // 1%
-  let expectedNet = expectedGross.sub(tradeFee);
+  let expectedGross = estimateSellSol(ca.basePrice, ca.slope, ca.currentSupply, tokenAmount);
 
-  // Cap at reserve balance (matches on-chain cap — prevents SlippageExceeded)
-  if (expectedNet.gt(ca.reserveBalance)) {
-    expectedNet = ca.reserveBalance;
+  // Cap gross at reserve balance (matches on-chain cap — prevents SlippageExceeded)
+  if (expectedGross.gt(ca.reserveBalance)) {
+    expectedGross = ca.reserveBalance;
   }
+
+  const tradeFee = expectedGross.muln(100).divn(10_000); // 1%
+  const expectedNet = expectedGross.sub(tradeFee);
 
   const minSolOut = expectedNet.muln(10_000 - slippageBps).divn(10_000);
 
@@ -701,11 +702,29 @@ export async function raydiumBuy(
   tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: buyerWsolAta, lamports: solLamports.toNumber() }));
   tx.add(createSyncNativeInstruction(buyerWsolAta));
 
+  // Estimate expected output via constant product (x*y=k) for slippage protection
+  const wsolVault = wsolIsToken0 ? token0Vault : token1Vault;
+  const tokenVault = wsolIsToken0 ? token1Vault : token0Vault;
+  let minAmountOut = new BN(0);
+  try {
+    const [wsolBal, tokenBal] = await Promise.all([
+      connection.getTokenAccountBalance(wsolVault),
+      connection.getTokenAccountBalance(tokenVault),
+    ]);
+    const wsolReserve = new BN(wsolBal.value.amount);
+    const tokenReserve = new BN(tokenBal.value.amount);
+    if (tokenReserve.gtn(0) && wsolReserve.gtn(0)) {
+      // dy = y * dx / (x + dx)
+      const expectedOut = tokenReserve.mul(solLamports).div(wsolReserve.add(solLamports));
+      minAmountOut = expectedOut.muln(10_000 - slippageBps).divn(10_000);
+    }
+  } catch { /* fallback to 0 if pool read fails */ }
+
   // swap_base_input IX data: discriminator(8) + amount_in(8) + min_amount_out(8)
   const data = Buffer.concat([
     SWAP_BASE_INPUT_DISCRIMINATOR,
     bnToU64LE(solLamports),
-    bnToU64LE(new BN(0)), // min_amount_out
+    bnToU64LE(minAmountOut),
   ]);
 
   // input = WSOL, output = Token
@@ -764,11 +783,29 @@ export async function raydiumSell(
     tx.add(createAssociatedTokenAccountInstruction(seller, sellerWsolAta, seller, WSOL_MINT));
   }
 
+  // Estimate expected SOL output via constant product (x*y=k) for slippage protection
+  const wsolVault = wsolIsToken0 ? token0Vault : token1Vault;
+  const tokenVault = wsolIsToken0 ? token1Vault : token0Vault;
+  let minAmountOut = new BN(0);
+  try {
+    const [wsolBal, tokenBal] = await Promise.all([
+      connection.getTokenAccountBalance(wsolVault),
+      connection.getTokenAccountBalance(tokenVault),
+    ]);
+    const wsolReserve = new BN(wsolBal.value.amount);
+    const tokenReserve = new BN(tokenBal.value.amount);
+    if (wsolReserve.gtn(0) && tokenReserve.gtn(0)) {
+      // dy = y * dx / (x + dx)
+      const expectedOut = wsolReserve.mul(tokenAmount).div(tokenReserve.add(tokenAmount));
+      minAmountOut = expectedOut.muln(10_000 - slippageBps).divn(10_000);
+    }
+  } catch { /* fallback to 0 if pool read fails */ }
+
   // swap_base_input IX data: discriminator(8) + amount_in(8) + min_amount_out(8)
   const data = Buffer.concat([
     SWAP_BASE_INPUT_DISCRIMINATOR,
     bnToU64LE(tokenAmount),
-    bnToU64LE(new BN(0)), // min_amount_out
+    bnToU64LE(minAmountOut),
   ]);
 
   // input = Token, output = WSOL
