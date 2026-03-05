@@ -123,12 +123,12 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
 
         {/* Deadline + Escrow */}
         <div className="flex items-center justify-between font-mono border-t border-border/40 pt-2 mt-1">
-          <span className="flex items-center gap-1.5 text-[9px]">
-            <Clock className="w-3 h-3 text-warning" />
+          <span className="flex items-center gap-1.5 text-xs">
+            <Clock className="w-3.5 h-3.5 text-warning" />
             <span className="text-text-secondary font-display">{formatRemaining(token.deadlineTimestamp)}</span>
           </span>
-          <span className="flex items-center gap-1.5 text-[9px]">
-            <Shield className="w-3 h-3 text-primary" />
+          <span className="flex items-center gap-1.5 text-xs">
+            <Shield className="w-3.5 h-3.5 text-primary" />
             <span className="text-text-secondary font-score">{formatSol(token.collateralAmount)}</span>
           </span>
         </div>

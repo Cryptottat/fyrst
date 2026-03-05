@@ -124,7 +124,7 @@ export default function Hero() {
                 <span className="text-[10px] font-display text-secondary animate-blink"> ]</span>
               </div>
             </Link>
-            <Link href="/dashboard" className="w-full opacity-0 animate-slide-in" style={{ animationDelay: "0.1s" }} onClick={handleButtonClick}>
+            <Link href="/floor" className="w-full opacity-0 animate-slide-in" style={{ animationDelay: "0.1s" }} onClick={handleButtonClick}>
               <div className="arcade-border bg-primary/5 border-primary/60 px-6 py-3.5 flex items-center justify-center gap-3 hover:bg-primary/10 hover:shadow-[0_0_16px_rgba(167,139,250,0.3)] transition-all cursor-pointer group w-full">
                 <span className="text-[10px] font-display text-primary">[ </span>
                 <span className="text-[10px] font-display text-primary neon-text-subtle">SELECT PLAYER (BROWSE)</span>

@@ -4,13 +4,19 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import { fetchPortfolio, type ApiPortfolio, type ApiPortfolioHolding } from "@/lib/api";
-import { useAnchorProgram, fetchBondingCurve } from "@/lib/anchor";
+import { fetchPortfolio, fetchDeployer, type ApiPortfolio, type ApiPortfolioHolding } from "@/lib/api";
+import {
+  useAnchorProgram,
+  fetchBondingCurve,
+  getEscrowPDA,
+  getCurvePDA,
+} from "@/lib/anchor";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection } from "@solana/web3.js";
 import { formatSol, formatCompact, formatAddress } from "@/lib/utils";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Shield, Coins, Loader2 } from "lucide-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 
 interface EnrichedHolding extends ApiPortfolioHolding {
   onChainBalance?: number;
@@ -18,14 +24,90 @@ interface EnrichedHolding extends ApiPortfolioHolding {
   onChainPnl?: number;
 }
 
+interface ClaimableItem {
+  mint: string;
+  name: string;
+  symbol: string;
+  escrowLamports: number;
+  claimableFeeLamports: number;
+  graduated: boolean;
+}
+
+async function fetchClaimableItems(
+  connection: Connection,
+  wallet: PublicKey,
+  programId: PublicKey,
+): Promise<ClaimableItem[]> {
+  try {
+    const deployer = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "https://fyrst-production.up.railway.app"}/api/deployer/${wallet.toBase58()}`
+    );
+    if (!deployer.ok) return [];
+    const data = await deployer.json();
+    const tokens = data.data?.launchHistory ?? [];
+
+    const items: ClaimableItem[] = [];
+    for (const t of tokens) {
+      const mintPubkey = new PublicKey(t.mint);
+      const [escrowPDA] = getEscrowPDA(wallet, mintPubkey);
+      const [curvePDA] = getCurvePDA(mintPubkey);
+
+      const [escrowInfo, curveInfo] = await Promise.all([
+        connection.getAccountInfo(escrowPDA).catch(() => null),
+        connection.getAccountInfo(curvePDA).catch(() => null),
+      ]);
+
+      const escrowLamports = escrowInfo?.lamports ?? 0;
+
+      // Read claimable_fees from curve account (offset depends on struct layout)
+      let claimableFeeLamports = 0;
+      if (curveInfo?.data) {
+        // BondingCurve struct: 8(discriminator) + 32(deployer) + 32(token_mint) + 8*5(reserves) + 8(reserve_balance) + 8(total_deployer_fees) + 8(claimed_deployer_fees) + ...
+        // total_deployer_fees at offset 8+32+32+40+8 = 120
+        // claimed_deployer_fees at offset 128
+        // max_reserve_reached at offset 136
+        // graduated at offset 144 (bool)
+        const buf = curveInfo.data;
+        if (buf.length >= 144) {
+          const totalFees = Number(buf.readBigUInt64LE(120));
+          const claimedFees = Number(buf.readBigUInt64LE(128));
+          const maxReserve = Number(buf.readBigUInt64LE(136));
+          const graduated = buf[144] === 1;
+          const GRAD_THRESHOLD = 5_000_000_000; // 5 SOL devnet
+          const unlockRatio = graduated ? 1.0 : Math.min(maxReserve / GRAD_THRESHOLD, 1.0);
+          const unlocked = Math.floor(totalFees * unlockRatio);
+          claimableFeeLamports = Math.max(unlocked - claimedFees, 0);
+        }
+      }
+
+      if (escrowLamports > 0 || claimableFeeLamports > 0) {
+        items.push({
+          mint: t.mint,
+          name: t.name,
+          symbol: t.symbol,
+          escrowLamports,
+          claimableFeeLamports,
+          graduated: t.graduated,
+        });
+      }
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
 export default function PortfolioPage() {
   const { publicKey, connected } = useWallet();
   const { setVisible } = useWalletModal();
   const { program } = useAnchorProgram();
+  const { connection } = useConnection();
 
   const [portfolio, setPortfolio] = useState<ApiPortfolio | null>(null);
   const [holdings, setHoldings] = useState<EnrichedHolding[]>([]);
+  const [claimables, setClaimables] = useState<ClaimableItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [claimLoading, setClaimLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadPortfolio = useCallback(async () => {
@@ -44,7 +126,7 @@ export default function PortfolioPage() {
               const mintPubkey = new PublicKey(h.tokenMint);
               const curve = await fetchBondingCurve(program, mintPubkey);
               const currentPrice = curve
-                ? curve.virtualSolReserves.toNumber() / curve.virtualTokenReserves.toNumber()
+                ? (curve.virtualSolReserves.toNumber() / 1e9) / (curve.virtualTokenReserves.toNumber() / 1e6)
                 : h.avgBuyPrice;
               const onChainBalance = h.balance;
               const costBasis = onChainBalance * h.avgBuyPrice;
@@ -66,6 +148,17 @@ export default function PortfolioPage() {
       setLoading(false);
     }
   }, [publicKey, program]);
+
+  // Load claimable escrows & fees
+  useEffect(() => {
+    if (!publicKey || !connection) return;
+    setClaimLoading(true);
+    const programId = new PublicKey("CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP");
+    fetchClaimableItems(connection, publicKey, programId).then((items) => {
+      setClaimables(items);
+      setClaimLoading(false);
+    });
+  }, [publicKey, connection]);
 
   useEffect(() => {
     if (connected) loadPortfolio();
@@ -122,6 +215,68 @@ export default function PortfolioPage() {
           </Card>
         </div>
 
+        {/* Claimable Escrows & Fees */}
+        {claimables.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-[10px] font-display text-primary mb-3 neon-text-subtle tracking-wider">
+              CLAIMABLE REWARDS
+            </h2>
+            <div className="space-y-2">
+              {claimables.map((item) => (
+                <Link key={item.mint} href={`/token/${item.mint}`}>
+                  <Card hover className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-[10px] font-display text-text-primary leading-relaxed">{item.name}</h3>
+                        <span className="text-xs font-mono text-text-muted">${item.symbol}</span>
+                        {item.graduated && (
+                          <span className="text-[7px] font-display px-1.5 py-0.5 bg-success/20 text-success">GRADUATED</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-text-muted font-mono">{formatAddress(item.mint)}</p>
+                    </div>
+                    <div className="flex gap-4 shrink-0">
+                      {item.escrowLamports > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5 text-accent" />
+                          <div className="text-right">
+                            <p className="text-[8px] text-text-muted font-display">ESCROW</p>
+                            <p className="text-sm font-score text-accent neon-text-subtle">
+                              {formatSol(item.escrowLamports / 1e9)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {item.claimableFeeLamports > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <Coins className="w-3.5 h-3.5 text-success" />
+                          <div className="text-right">
+                            <p className="text-[8px] text-text-muted font-display">FEES</p>
+                            <p className="text-sm font-score text-success neon-text-subtle">
+                              {formatSol(item.claimableFeeLamports / 1e9)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {claimLoading && (
+          <div className="mb-8 flex items-center gap-2 text-text-muted">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span className="text-[10px] font-display">SCANNING CLAIMABLE REWARDS...</span>
+          </div>
+        )}
+
+        {/* Holdings */}
+        <h2 className="text-[10px] font-display text-text-muted mb-3 tracking-wider">
+          TOKEN HOLDINGS
+        </h2>
+
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <p className="text-[10px] font-display text-text-muted animate-blink">LOADING SAVE FILE...</p>
@@ -133,7 +288,7 @@ export default function PortfolioPage() {
         ) : holdings.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-[10px] font-display text-text-muted mb-4">INVENTORY EMPTY.</p>
-            <Link href="/dashboard">
+            <Link href="/floor">
               <Button variant="outline">[ BROWSE LAUNCHES ]</Button>
             </Link>
           </div>

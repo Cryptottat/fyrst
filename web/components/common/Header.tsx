@@ -10,7 +10,7 @@ import { Menu, X } from "lucide-react";
 const navLinks = [
   { label: "ABOUT", href: "/about" },
   { label: "$FYRST", href: "/fyrst-token" },
-  { label: "PLAYER", href: "/dashboard" },
+  { label: "FLOOR", href: "/floor" },
   { label: "LAUNCH", href: "/launch" },
   { label: "BOUNTY", href: "/bounty" },
   { label: "PORTFOLIO", href: "/portfolio" },

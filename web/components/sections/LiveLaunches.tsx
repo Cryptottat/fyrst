@@ -151,7 +151,7 @@ export default function LiveLaunches({ limit = 6, showViewAll = true }: LiveLaun
           </div>
           {showViewAll && (
             <Link
-              href="/dashboard"
+              href="/floor"
               className="text-[9px] font-display text-primary hover:text-primary/80 transition-colors neon-text-subtle"
             >
               [ VIEW ALL CHALLENGERS ]

@@ -100,7 +100,7 @@ export default function DeployerPage({
             <span className="text-primary">&gt; </span>
             No profile for {formatAddress(address, 8)}.
           </p>
-          <Link href="/dashboard">
+          <Link href="/floor">
             <Button variant="outline">[ BACK TO DASHBOARD ]</Button>
           </Link>
         </div>

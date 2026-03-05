@@ -646,7 +646,7 @@ export default function TokenDetailPage({
             <span className="text-primary">&gt; </span>
             No data for {formatAddress(mint, 8)}.
           </p>
-          <Link href="/dashboard">
+          <Link href="/floor">
             <Button variant="outline">[ BACK TO DASHBOARD ]</Button>
           </Link>
         </div>

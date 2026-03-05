@@ -66,25 +66,20 @@ const roadmap = [
     detail: "Real-time browsing of launches with deployer reputation scores.",
   },
   {
-    status: "DEVNET",
+    status: "LIVE",
     title: "Launchpad + Graduation",
     detail:
       "Bonding curve trading, auto-graduation to Raydium CPMM, LP lock.",
   },
   {
+    status: "LIVE",
+    title: "Auto-Graduation Cranker",
+    detail: "Permissionless cranker for instant DEX graduation — anyone can trigger it.",
+  },
+  {
     status: "NEXT",
     title: "$FYRST Governance Token",
     detail: "Community governance over protocol parameters and treasury.",
-  },
-  {
-    status: "NEXT",
-    title: "Telegram Trading Bot",
-    detail: "Snipe launches, check reputation, and trade — all from Telegram.",
-  },
-  {
-    status: "NEXT",
-    title: "Auto-Graduation Cranker",
-    detail: "Permissionless cranker network for instant DEX graduation.",
   },
 ];
 
@@ -304,10 +299,10 @@ export default function AboutPage() {
                 MEET BUSTER
               </h2>
               <img
-                src="/images/favicon-buster-face-512.png"
+                src="/images/buster-hero.png"
                 alt="Buster the Border Collie"
-                width={128}
-                height={128}
+                width={200}
+                height={200}
                 className="mx-auto mb-4 rounded-lg"
               />
               <p className="text-xs text-text-secondary font-mono leading-relaxed max-w-md mx-auto">
@@ -331,9 +326,9 @@ export default function AboutPage() {
               Browse live launches or create your own.
             </p>
             <div className="flex gap-3 justify-center flex-wrap">
-              <Link href="/dashboard">
+              <Link href="/floor">
                 <Button variant="primary" size="md">
-                  DASHBOARD
+                  FLOOR
                 </Button>
               </Link>
               <Link href="/launch">
