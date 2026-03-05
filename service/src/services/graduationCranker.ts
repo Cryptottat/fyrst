@@ -209,8 +209,18 @@ export async function executeGraduation(tokenMint: string): Promise<void> {
   // 7. Build multi-IX transaction
   const tx = new Transaction();
 
-  // IX 0: Compute budget
+  // IX 0: Compute budget + priority fee
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }));
+  // Fetch recent priority fees for reliable block inclusion
+  let priorityFee = 50_000; // default 50K microLamports
+  try {
+    const recentFees = await connection.getRecentPrioritizationFees();
+    if (recentFees.length > 0) {
+      const sorted = recentFees.map(f => f.prioritizationFee).sort((a, b) => a - b);
+      priorityFee = Math.max(sorted[Math.floor(sorted.length * 0.75)], 1_000);
+    }
+  } catch { /* use default */ }
+  tx.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee }));
 
   // IX 1: Create payer's WSOL ATA if needed
   const wsolAtaInfo = await connection.getAccountInfo(payerWsolAccount);
@@ -280,7 +290,7 @@ export async function executeGraduation(tokenMint: string): Promise<void> {
 
   // 8. Simulate first
   tx.feePayer = payer.publicKey;
-  const { blockhash } = await connection.getLatestBlockhash();
+  let { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
 
   const sim = await connection.simulateTransaction(tx);
@@ -296,7 +306,11 @@ export async function executeGraduation(tokenMint: string): Promise<void> {
     `Graduation simulation OK for ${tokenMint} — CU=${sim.value.unitsConsumed}, sending TX...`,
   );
 
-  // 9. Send and confirm
+  // 9. Get fresh blockhash right before sending (simulation may have taken time)
+  ({ blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash());
+  tx.recentBlockhash = blockhash;
+
+  // 10. Send and confirm
   const sig = await sendAndConfirmTransaction(connection, tx, [payer], {
     commitment: "confirmed",
   });
@@ -308,6 +322,24 @@ export async function executeGraduation(tokenMint: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // Retry wrapper
 // ---------------------------------------------------------------------------
+
+/** Check if an error is transient (worth retrying) vs permanent */
+function isTransientError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  // Transient: blockhash expired, TX dropped, network issues
+  const transient = [
+    "Blockhash not found",
+    "block height exceeded",
+    "timeout",
+    "ECONNRESET",
+    "socket hang up",
+    "503",
+    "429",
+    "Too Many Requests",
+    "TransactionExpiredBlockheightExceededError",
+  ];
+  return transient.some(t => msg.includes(t));
+}
 
 export async function executeWithRetry(
   tokenMint: string,
@@ -330,14 +362,18 @@ export async function executeWithRetry(
           `Graduation attempt ${attempt}/${maxRetries} failed for ${tokenMint}`,
           err,
         );
-        if (attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, 5000));
+        // Only retry on transient errors (blockhash expired, network issues)
+        // Don't retry on simulation failures or account errors (permanent)
+        if (!isTransientError(err) || attempt >= maxRetries) {
+          logger.error(
+            `Graduation failed permanently for ${tokenMint} — ${isTransientError(err) ? "max retries" : "non-retryable error"}`,
+          );
+          break;
         }
+        // Exponential backoff: 2s → 4s → 8s
+        await new Promise((r) => setTimeout(r, 2000 * Math.pow(2, attempt - 1)));
       }
     }
-    logger.error(
-      `All ${maxRetries} graduation attempts failed for ${tokenMint}`,
-    );
   } finally {
     inProgress.delete(tokenMint);
   }

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, ComputeBudgetProgram, Connection } from "@solana/web3.js";
+import { PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, ComputeBudgetProgram, Connection, TransactionInstruction } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
@@ -46,6 +46,31 @@ export const TOKEN_TOTAL_SUPPLY_AMM = new BN("1000000000000000"); // 1B atomic
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IDL = idlJson as any;
+
+// ---------------------------------------------------------------------------
+// Priority Fee Helper
+// ---------------------------------------------------------------------------
+
+/** Fetch recent priority fee and return a setComputeUnitPrice IX.
+ *  Uses the 75th percentile of recent fees, with a min of 1,000 microLamports.
+ *  Falls back to 50,000 microLamports if RPC call fails. */
+async function getPriorityFeeIx(connection: Connection): Promise<TransactionInstruction> {
+  const DEFAULT_FEE = 50_000; // fallback: 50K microLamports
+  const MIN_FEE = 1_000;
+  try {
+    const fees = await connection.getRecentPrioritizationFees();
+    if (!fees.length) {
+      return ComputeBudgetProgram.setComputeUnitPrice({ microLamports: DEFAULT_FEE });
+    }
+    // Use 75th percentile for reliable inclusion
+    const sorted = fees.map(f => f.prioritizationFee).sort((a, b) => a - b);
+    const p75 = sorted[Math.floor(sorted.length * 0.75)];
+    const fee = Math.max(p75, MIN_FEE);
+    return ComputeBudgetProgram.setComputeUnitPrice({ microLamports: fee });
+  } catch {
+    return ComputeBudgetProgram.setComputeUnitPrice({ microLamports: DEFAULT_FEE });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // PDA Derivation
@@ -179,6 +204,7 @@ export async function launchToken(
   // Single TX: escrow + bonding curve (1 wallet signature)
   const tx = new Transaction()
     .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+    .add(await getPriorityFeeIx(provider.connection))
     .add(escrowIx, curveIx);
   const txSig = await provider.sendAndConfirm(tx, [tokenMintKeypair]);
 
@@ -274,6 +300,7 @@ export async function launchAndBuy(
   // Single TX: escrow + curve + buy (1 wallet signature)
   const tx = new Transaction()
     .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }))
+    .add(await getPriorityFeeIx(provider.connection))
     .add(escrowIx, curveIx, buyIx);
   const txSig = await provider.sendAndConfirm(tx, [tokenMintKeypair]);
 
@@ -362,6 +389,7 @@ export async function buyTokens(
 
   const tx = new Transaction()
     .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+    .add(await getPriorityFeeIx(provider.connection))
     .add(buyIx);
   return await provider.sendAndConfirm(tx, []);
 }
@@ -420,6 +448,7 @@ export async function sellTokens(
 
   const tx = new Transaction()
     .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }))
+    .add(await getPriorityFeeIx(provider.connection))
     .add(sellIx);
   return await provider.sendAndConfirm(tx, []);
 }
@@ -599,8 +628,9 @@ export async function graduateToDex(
   // Build multi-IX transaction
   const tx = new Transaction();
 
-  // IX 0: Compute budget
+  // IX 0: Compute budget + priority fee
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }));
+  tx.add(await getPriorityFeeIx(connection));
 
   // IX 1: Create payer WSOL ATA if needed
   const wsolAtaInfo = await connection.getAccountInfo(payerWsolAccount);
@@ -715,6 +745,7 @@ export async function raydiumBuy(
 
   const tx = new Transaction();
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }));
+  tx.add(await getPriorityFeeIx(connection));
 
   // Create token ATA if needed
   const tokenAtaInfo = await connection.getAccountInfo(buyerTokenAta);
@@ -806,6 +837,7 @@ export async function raydiumSell(
 
   const tx = new Transaction();
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }));
+  tx.add(await getPriorityFeeIx(connection));
 
   // Create WSOL ATA if needed
   const wsolAtaInfo = await connection.getAccountInfo(sellerWsolAta);

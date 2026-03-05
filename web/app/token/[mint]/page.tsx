@@ -27,6 +27,7 @@ import {
   claimFees,
   releaseEscrow,
   expireEscrow,
+  processRefund,
   graduateToDex,
   TOKEN_DECIMALS,
   type BondingCurveData,
@@ -103,6 +104,7 @@ export default function TokenDetailPage({
 
   // Escrow release
   const [escrowStatus, setEscrowStatus] = useState<TxStatus>("idle");
+  const [refundStatus, setRefundStatus] = useState<TxStatus>("idle");
   const [escrowBalance, setEscrowBalance] = useState<number | null>(null); // lamports
 
   // Live countdown timer
@@ -631,6 +633,25 @@ export default function TokenDetailPage({
       setEscrowStatus("error");
       setTxError(err instanceof Error ? err.message : "Escrow expire failed");
       setTimeout(() => setEscrowStatus("idle"), 3000);
+    }
+  };
+
+  // Process refund: buyer burns tokens → pro-rata SOL from escrow
+  const handleProcessRefund = async () => {
+    if (!program || !publicKey || !curveData) return;
+    setRefundStatus("loading");
+    setTxError(null);
+    try {
+      await processRefund(program, publicKey, curveData.deployer, new PublicKey(mint));
+      setRefundStatus("success");
+      await new Promise((r) => setTimeout(r, 1500));
+      await refreshOnChainData();
+      setSplBalance(0);
+      setTimeout(() => setRefundStatus("idle"), 3000);
+    } catch (err: unknown) {
+      setRefundStatus("error");
+      setTxError(err instanceof Error ? err.message : "Refund failed");
+      setTimeout(() => setRefundStatus("idle"), 3000);
     }
   };
 
@@ -1388,6 +1409,39 @@ export default function TokenDetailPage({
                     </div>
                   )}
                 </div>
+              </Card>
+            )}
+            {/* Buyer refund — show when deadline passed, not graduated, buyer holds tokens */}
+            {!isDeployer && !curveData?.graduated && splBalance != null && splBalance > 0 &&
+             escrowBalance != null && escrowBalance > 0 &&
+             token?.deadlineTimestamp && new Date(token.deadlineTimestamp).getTime() < Date.now() && (
+              <Card className="mt-4 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-text-muted">Your Tokens</span>
+                  <span className="font-score text-sm text-accent neon-text-subtle">
+                    {splBalance.toLocaleString()} {token?.symbol}
+                  </span>
+                </div>
+                <p className="text-[8px] text-text-muted mb-2">
+                  Deadline expired. Burn your tokens to claim a pro-rata SOL refund from the escrow.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleProcessRefund}
+                  disabled={refundStatus === "loading" || refundStatus === "success"}
+                >
+                  {refundStatus === "loading" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-3 h-3 animate-spin" /> REFUNDING...
+                    </span>
+                  ) : refundStatus === "success" ? (
+                    "REFUNDED!"
+                  ) : (
+                    "[ CLAIM REFUND ]"
+                  )}
+                </Button>
               </Card>
             )}
           </div>
