@@ -21,7 +21,7 @@ const coreFeatures = [
     tag: "03",
     title: "AUTO-REFUND ON RUG",
     description:
-      "If a deployer abandons their token, collateral is automatically distributed back to holders. No governance vote, no waiting — just protection.",
+      "If a deployer abandons their token before the deadline, collateral is distributed back to holders. If the token graduates successfully, the deployer can reclaim their escrow SOL from the token page.",
   },
 ];
 
@@ -47,7 +47,7 @@ const journeySteps = [
     phase: "LIVE",
     label: "Open Market",
     detail:
-      "Token trades freely on Raydium. Deployer collateral is released after lock period.",
+      "Token trades freely on Raydium. Deployer can reclaim their escrow collateral from the token page after graduation.",
   },
 ];
 

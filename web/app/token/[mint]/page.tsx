@@ -19,11 +19,13 @@ import {
   useAnchorProgram,
   fetchBondingCurve,
   getCurvePDA,
+  getEscrowPDA,
   buyTokens,
   sellTokens,
   raydiumBuy,
   raydiumSell,
   claimFees,
+  releaseEscrow,
   graduateToDex,
   TOKEN_DECIMALS,
   type BondingCurveData,
@@ -97,6 +99,10 @@ export default function TokenDetailPage({
 
   // Claim fees
   const [claimStatus, setClaimStatus] = useState<TxStatus>("idle");
+
+  // Escrow release
+  const [escrowStatus, setEscrowStatus] = useState<TxStatus>("idle");
+  const [escrowBalance, setEscrowBalance] = useState<number | null>(null); // lamports
 
   // Confirm modal
   const [confirmModal, setConfirmModal] = useState<{
@@ -572,6 +578,34 @@ export default function TokenDetailPage({
       setMigrateStatus("error");
       setTxError(err instanceof Error ? err.message : "Migration failed");
       setTimeout(() => setMigrateStatus("idle"), 3000);
+    }
+  };
+
+  // Fetch escrow balance for deployer
+  useEffect(() => {
+    if (!publicKey || !connection || !curveData) { setEscrowBalance(null); return; }
+    if (publicKey.toBase58() !== curveData.deployer.toBase58()) { setEscrowBalance(null); return; }
+    const [escrowPDA] = getEscrowPDA(publicKey, new PublicKey(mint));
+    connection.getAccountInfo(escrowPDA).then((info) => {
+      setEscrowBalance(info ? info.lamports : 0);
+    }).catch(() => setEscrowBalance(null));
+  }, [publicKey, connection, mint, curveData, escrowStatus]);
+
+  const handleReleaseEscrow = async () => {
+    if (!program || !publicKey) return;
+    setEscrowStatus("loading");
+    setTxError(null);
+    try {
+      await releaseEscrow(program, publicKey, new PublicKey(mint));
+      setEscrowStatus("success");
+      await new Promise((r) => setTimeout(r, 1500));
+      await refreshOnChainData();
+      setEscrowBalance(0);
+      setTimeout(() => setEscrowStatus("idle"), 3000);
+    } catch (err: unknown) {
+      setEscrowStatus("error");
+      setTxError(err instanceof Error ? err.message : "Escrow release failed");
+      setTimeout(() => setEscrowStatus("idle"), 3000);
     }
   };
 
@@ -1235,6 +1269,37 @@ export default function TokenDetailPage({
                           "CLAIMED!"
                         ) : (
                           "[ CLAIM FEES ]"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {/* Escrow release — show after graduation if deployer has unreleased escrow */}
+                  {isDeployer && curveData?.graduated && escrowBalance != null && escrowBalance > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] text-text-muted">Escrow Collateral</span>
+                        <span className="font-score text-sm text-accent neon-text-subtle">
+                          {formatSol(escrowBalance / 1e9)} SOL
+                        </span>
+                      </div>
+                      <p className="text-[8px] text-text-muted mb-2">
+                        Token graduated! Reclaim your collateral.
+                      </p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="w-full"
+                        onClick={handleReleaseEscrow}
+                        disabled={escrowStatus === "loading" || escrowStatus === "success"}
+                      >
+                        {escrowStatus === "loading" ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin" /> RELEASING...
+                          </span>
+                        ) : escrowStatus === "success" ? (
+                          "RELEASED!"
+                        ) : (
+                          "[ RELEASE ESCROW ]"
                         )}
                       </Button>
                     </div>
