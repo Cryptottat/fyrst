@@ -26,6 +26,7 @@ import {
   raydiumSell,
   claimFees,
   releaseEscrow,
+  expireEscrow,
   graduateToDex,
   TOKEN_DECIMALS,
   type BondingCurveData,
@@ -581,15 +582,14 @@ export default function TokenDetailPage({
     }
   };
 
-  // Fetch escrow balance for deployer
+  // Fetch escrow balance (using curveData.deployer so it works for any visitor)
   useEffect(() => {
-    if (!publicKey || !connection || !curveData) { setEscrowBalance(null); return; }
-    if (publicKey.toBase58() !== curveData.deployer.toBase58()) { setEscrowBalance(null); return; }
-    const [escrowPDA] = getEscrowPDA(publicKey, new PublicKey(mint));
+    if (!connection || !curveData) { setEscrowBalance(null); return; }
+    const [escrowPDA] = getEscrowPDA(curveData.deployer, new PublicKey(mint));
     connection.getAccountInfo(escrowPDA).then((info) => {
       setEscrowBalance(info ? info.lamports : 0);
     }).catch(() => setEscrowBalance(null));
-  }, [publicKey, connection, mint, curveData, escrowStatus]);
+  }, [connection, mint, curveData, escrowStatus]);
 
   const handleReleaseEscrow = async () => {
     if (!program || !publicKey) return;
@@ -605,6 +605,24 @@ export default function TokenDetailPage({
     } catch (err: unknown) {
       setEscrowStatus("error");
       setTxError(err instanceof Error ? err.message : "Escrow release failed");
+      setTimeout(() => setEscrowStatus("idle"), 3000);
+    }
+  };
+
+  const handleExpireEscrow = async () => {
+    if (!program || !publicKey || !curveData) return;
+    setEscrowStatus("loading");
+    setTxError(null);
+    try {
+      await expireEscrow(program, curveData.deployer, new PublicKey(mint));
+      setEscrowStatus("success");
+      await new Promise((r) => setTimeout(r, 1500));
+      await refreshOnChainData();
+      setEscrowBalance(0);
+      setTimeout(() => setEscrowStatus("idle"), 3000);
+    } catch (err: unknown) {
+      setEscrowStatus("error");
+      setTxError(err instanceof Error ? err.message : "Escrow expire failed");
       setTimeout(() => setEscrowStatus("idle"), 3000);
     }
   };
@@ -1300,6 +1318,39 @@ export default function TokenDetailPage({
                           "RELEASED!"
                         ) : (
                           "[ RELEASE ESCROW ]"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {/* Escrow expire — show when deadline passed, not graduated, no holders */}
+                  {!curveData?.graduated && escrowBalance != null && escrowBalance > 0 &&
+                   token?.deadlineTimestamp && new Date(token.deadlineTimestamp).getTime() < Date.now() &&
+                   curveData?.currentSupply?.isZero() && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] text-text-muted">Escrow Expired</span>
+                        <span className="font-score text-sm text-warning neon-text-subtle">
+                          {formatSol(escrowBalance / 1e9)} SOL
+                        </span>
+                      </div>
+                      <p className="text-[8px] text-text-muted mb-2">
+                        Deadline passed with no holders. 50% refund to deployer, 50% to $FYRST buyback+burn.
+                      </p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="w-full"
+                        onClick={handleExpireEscrow}
+                        disabled={escrowStatus === "loading" || escrowStatus === "success"}
+                      >
+                        {escrowStatus === "loading" ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin" /> EXPIRING...
+                          </span>
+                        ) : escrowStatus === "success" ? (
+                          "EXPIRED!"
+                        ) : (
+                          "[ EXPIRE ESCROW ]"
                         )}
                       </Button>
                     </div>

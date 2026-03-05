@@ -52,4 +52,7 @@ pub enum FyrstError {
 
     #[msg("Reserve balance is zero — nothing to migrate")]
     EmptyReserve,
+
+    #[msg("Tokens are still in circulation — use process_refund instead")]
+    TokensStillCirculating,
 }

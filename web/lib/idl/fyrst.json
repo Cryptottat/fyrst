@@ -400,6 +400,110 @@
       ]
     },
     {
+      "name": "expire_escrow",
+      "docs": [
+        "Expire escrow after deadline (permissionless). 50% deployer refund, 50% treasury buyback+burn."
+      ],
+      "discriminator": [
+        49,
+        150,
+        54,
+        201,
+        45,
+        106,
+        39,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "deployer",
+          "writable": true,
+          "relations": [
+            "escrow_vault"
+          ]
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deployer"
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.token_mint",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bonding_curve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  117,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow_vault.token_mint",
+                "account": "EscrowVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "graduate",
       "docs": [
         "Graduate a bonding curve when reserve meets threshold"
@@ -1771,6 +1875,11 @@
       "code": 6016,
       "name": "EmptyReserve",
       "msg": "Reserve balance is zero — nothing to migrate"
+    },
+    {
+      "code": 6017,
+      "name": "TokensStillCirculating",
+      "msg": "Tokens are still in circulation — use process_refund instead"
     }
   ],
   "types": [

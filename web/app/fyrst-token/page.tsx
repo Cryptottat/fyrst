@@ -228,6 +228,138 @@ export default function FyrstTokenPage() {
           </div>
         </section>
 
+        {/* Escrow Expiry Mechanism */}
+        <section className="mb-12">
+          <div className="text-center mb-8">
+            <h2 className="text-xs font-display text-text-primary mb-2 leading-relaxed">
+              ESCROW EXPIRY & BURN
+            </h2>
+            <p className="text-sm text-text-secondary font-mono">
+              <span className="text-primary">&gt; </span>
+              Every expired escrow feeds $FYRST buy pressure.
+            </p>
+          </div>
+
+          <Card padding="lg" className="mb-4">
+            <h3 className="text-[10px] font-display text-primary mb-4 neon-text-subtle">
+              HOW IT WORKS
+            </h3>
+            <div className="space-y-3 text-xs text-text-secondary font-mono leading-relaxed">
+              <p>
+                Every token launched on FYRST requires deployer collateral locked in
+                escrow. When a token&apos;s deadline expires without graduating, the
+                escrow collateral is processed based on holder activity:
+              </p>
+              <div className="arcade-border bg-bg p-4 my-4">
+                <p className="text-[10px] font-display text-text-primary mb-3">SCENARIO A: NO HOLDERS (current supply = 0)</p>
+                <div className="ml-2 space-y-1">
+                  <p><span className="text-warning">50%</span> → Deployer refund <span className="text-text-muted">(partial recovery)</span></p>
+                  <p><span className="text-primary">50%</span> → Treasury → <span className="text-primary neon-text-subtle">$FYRST Buyback + Burn</span></p>
+                </div>
+              </div>
+              <div className="arcade-border bg-bg p-4 my-4">
+                <p className="text-[10px] font-display text-text-primary mb-3">SCENARIO B: HOLDERS EXIST</p>
+                <div className="ml-2 space-y-1">
+                  <p><span className="text-success">100%</span> → Distributed to token holders <span className="text-text-muted">(pro-rata burn-to-refund)</span></p>
+                  <p className="text-text-muted text-[10px] mt-1">Holders burn their tokens to claim their proportional share of the escrow SOL.</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Flywheel Diagram */}
+          <Card padding="lg" className="mb-4">
+            <h3 className="text-[10px] font-display text-primary mb-4 neon-text-subtle">
+              $FYRST VALUE FLYWHEEL
+            </h3>
+            <div className="font-mono text-xs text-text-secondary leading-loose">
+              <div className="arcade-border bg-bg p-4 mb-4">
+                <p className="text-[10px] font-display text-text-primary mb-3 text-center">ESCROW EXPIRY FLOW (NO HOLDERS)</p>
+                <div className="space-y-1 text-center">
+                  <p className="text-warning">Deadline expires, no buyers</p>
+                  <p className="text-text-muted">&darr;</p>
+                  <p>Escrow SOL split 50/50</p>
+                  <p className="text-text-muted">&darr;</p>
+                  <div className="flex justify-center gap-8">
+                    <div className="text-center">
+                      <p className="text-warning">50% Deployer</p>
+                      <p className="text-text-muted text-[10px]">partial refund</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-primary neon-text-subtle">50% Treasury</p>
+                      <p className="text-text-muted text-[10px]">&darr;</p>
+                      <p className="text-primary neon-text-subtle">$FYRST Buyback</p>
+                      <p className="text-text-muted text-[10px]">&darr;</p>
+                      <p className="text-error">BURN</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="arcade-border bg-bg p-4">
+                <p className="text-[10px] font-display text-text-primary mb-3 text-center">ARBITRAGE FLYWHEEL (HOLDERS EXIST)</p>
+                <div className="space-y-1 text-center">
+                  <p className="text-success">Traders buy near deadline for escrow refund arbitrage</p>
+                  <p className="text-text-muted">&darr;</p>
+                  <p>Increased trading volume + 1% trade fees</p>
+                  <p className="text-text-muted">&darr;</p>
+                  <div className="flex justify-center gap-8">
+                    <div className="text-center">
+                      <p className="text-accent">0.5% Deployer</p>
+                      <p className="text-text-muted text-[10px]">builder reward</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-primary neon-text-subtle">0.5% Treasury</p>
+                      <p className="text-text-muted text-[10px]">&darr;</p>
+                      <p className="text-primary neon-text-subtle">30% → $FYRST Buyback</p>
+                      <p className="text-text-muted text-[10px]">&darr;</p>
+                      <p className="text-error">BURN</p>
+                    </div>
+                  </div>
+                  <p className="text-text-muted mt-2">&darr;</p>
+                  <p className="text-primary neon-text-subtle">$FYRST supply decreases → price increases</p>
+                  <p className="text-text-muted">&darr;</p>
+                  <p className="text-success">More traders attracted → cycle repeats</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card padding="lg">
+            <h3 className="text-[10px] font-display text-primary mb-4 neon-text-subtle">
+              WHY THIS MATTERS
+            </h3>
+            <div className="space-y-3 text-xs text-text-secondary font-mono leading-relaxed">
+              <p>
+                <span className="text-text-primary">Arbitrage incentive:</span>{" "}
+                When a token&apos;s deadline approaches and the escrow collateral
+                exceeds the token&apos;s market value, traders are incentivized to
+                buy the token to claim a larger share of the escrow refund. This
+                creates natural buy pressure and trading volume near deadlines.
+              </p>
+              <p>
+                <span className="text-text-primary">Fee generation:</span>{" "}
+                Every trade from these arbitrageurs generates 1% fees — 0.5% to
+                deployers and 0.5% to the treasury. The treasury&apos;s share
+                triggers automatic $FYRST buyback and burn on Jupiter.
+              </p>
+              <p>
+                <span className="text-text-primary">Deflationary pressure:</span>{" "}
+                Whether through direct escrow expiry (50% treasury buyback+burn)
+                or through increased trading activity (fee-driven buyback+burn),
+                every expired token contributes to $FYRST&apos;s deflationary
+                mechanics and price support.
+              </p>
+              <p>
+                <span className="text-text-primary">Virtuous cycle:</span>{" "}
+                More launches → more escrow collateral at risk → more arbitrage
+                opportunities → more trading volume → more fees → more $FYRST
+                burned → higher $FYRST price → more users attracted to the platform.
+              </p>
+            </div>
+          </Card>
+        </section>
+
         {/* Tokenomics */}
         <section className="mb-12">
           <div className="text-center mb-8">

@@ -221,22 +221,25 @@ export default function DashboardPage() {
       });
     } else if (sort === "collateral") {
       list = [...list].sort((a, b) => b.collateralAmount - a.collateralAmount);
+    } else if (sort === "newest") {
+      list = [...list].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
     }
 
     return list;
   }, [search, tokens, sort, now]);
 
-  // Flash effect when the first card changes (LAST TRADE sort)
+  // Flash effect when any token has a trade (from socket price:update)
+  const lastTradedMint = useAppStore((s) => s.lastTradedMint);
+  const setLastTradedMint = useAppStore((s) => s.setLastTradedMint);
   useEffect(() => {
-    if (sort !== "lastTrade" || filtered.length === 0) return;
-    const firstMint = filtered[0].mint;
-    if (prevFirstRef.current && prevFirstRef.current !== firstMint) {
-      setFlashMint(firstMint);
-      const timer = setTimeout(() => setFlashMint(null), 1500);
-      return () => clearTimeout(timer);
-    }
-    prevFirstRef.current = firstMint;
-  }, [filtered, sort]);
+    if (!lastTradedMint) return;
+    setFlashMint(lastTradedMint);
+    setLastTradedMint(null);
+    const timer = setTimeout(() => setFlashMint(null), 1500);
+    return () => clearTimeout(timer);
+  }, [lastTradedMint, setLastTradedMint]);
 
   return (
     <main className="min-h-screen pt-20 pb-16 px-6">

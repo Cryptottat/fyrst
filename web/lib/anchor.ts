@@ -480,6 +480,33 @@ export async function releaseEscrow(
     .rpc();
 }
 
+/** Expire escrow after deadline (permissionless). 50% deployer refund, 50% treasury buyback+burn. */
+export async function expireEscrow(
+  program: FyrstProgram,
+  deployer: PublicKey,
+  tokenMint: PublicKey,
+): Promise<string> {
+  const [escrowVault] = getEscrowPDA(deployer, tokenMint);
+  const [bondingCurve] = getCurvePDA(tokenMint);
+  const [protocolConfig] = getProtocolConfigPDA();
+
+  // Fetch protocol config for treasury address
+  const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const treasury = configAccount.treasury as PublicKey;
+
+  return await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .expireEscrow()
+    .accounts({
+      deployer,
+      escrowVault,
+      bondingCurve,
+      protocolConfig,
+      treasury,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+}
+
 /** Initialize protocol config (one-time admin setup) */
 export async function initProtocol(
   program: FyrstProgram,

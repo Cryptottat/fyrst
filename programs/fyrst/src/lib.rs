@@ -35,6 +35,11 @@ pub mod fyrst {
         instructions::escrow::release_escrow(ctx)
     }
 
+    /// Expire escrow after deadline (permissionless). 50% deployer refund, 50% treasury buyback+burn.
+    pub fn expire_escrow(ctx: Context<ExpireEscrow>) -> Result<()> {
+        instructions::escrow::expire_escrow(ctx)
+    }
+
     /// Initialize bonding curve with SPL token mint + metadata (constant product AMM)
     pub fn init_bonding_curve(
         ctx: Context<InitBondingCurve>,

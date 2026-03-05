@@ -52,6 +52,10 @@ interface AppState {
   wsConnected: boolean;
   setWsConnected: (connected: boolean) => void;
 
+  // Last traded mint (for flash animation)
+  lastTradedMint: string | null;
+  setLastTradedMint: (mint: string | null) => void;
+
   // SOL price (from heartbeat)
   solPrice: number;
   setSolPrice: (price: number) => void;
@@ -113,6 +117,9 @@ export const useAppStore = create<AppState>()((set) => ({
       });
       return { prices: next };
     }),
+
+  lastTradedMint: null,
+  setLastTradedMint: (mint) => set({ lastTradedMint: mint }),
 
   wsConnected: false,
   setWsConnected: (connected) => set({ wsConnected: connected }),
