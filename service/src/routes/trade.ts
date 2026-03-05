@@ -5,11 +5,11 @@ import { validateBody } from "../middleware/validate";
 import { tradeLimiter } from "../middleware/rateLimiter";
 import { createTradeSchema } from "../schemas";
 import {
-  calculateBuyCost,
   calculateSellReturn,
-  spotPrice,
   estimateSlippage,
   calculateProgress,
+  approximateReserves,
+  spotPriceFromSupply,
 } from "../services/bondingCurve";
 import { getIo } from "../socketManager";
 
@@ -110,14 +110,17 @@ tradeRouter.post(
         newSupply = currentSupply;
       } else {
         // On-chain TX already validated balance — just record the trade
-        totalSol = clientSolAmount ?? calculateSellReturn(currentSupply, Math.min(amount, currentSupply));
+        const { virtualToken: sellVt, virtualSol: sellVs } = approximateReserves(currentSupply);
+        totalSol = clientSolAmount ?? calculateSellReturn(sellVt, sellVs, Math.min(amount, currentSupply));
         newSupply = Math.max(currentSupply - amount, 0);
       }
 
-      const newPrice = clientPrice || spotPrice(newSupply);
-      const slippage = estimateSlippage(currentSupply, Math.min(amount, Math.max(currentSupply, 1)), side);
+      const newPrice = clientPrice || spotPriceFromSupply(newSupply);
+      const { virtualToken: slipVt, virtualSol: slipVs } = approximateReserves(currentSupply);
+      const slippage = estimateSlippage(slipVt, slipVs, Math.min(amount, Math.max(currentSupply, 1)), side);
       const newMarketCap = newSupply * newPrice;
-      const progress = calculateProgress(newSupply, newPrice);
+      const { realSol: approxRealSol } = approximateReserves(newSupply);
+      const progress = calculateProgress(approxRealSol);
       const graduated = progress >= 100;
 
       // Use client-provided TX signature from on-chain trade, fallback to mock

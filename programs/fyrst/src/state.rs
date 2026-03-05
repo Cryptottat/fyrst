@@ -39,10 +39,16 @@ pub struct BondingCurve {
     pub token_mint: Pubkey,
     /// Current supply of tokens sold via the curve
     pub current_supply: u64,
-    /// Base price in lamports
-    pub base_price: u64,
-    /// Price slope (price increase per token)
-    pub slope: u64,
+    /// Virtual token reserves (constant product AMM)
+    pub virtual_token_reserves: u64,
+    /// Virtual SOL reserves (constant product AMM)
+    pub virtual_sol_reserves: u64,
+    /// Real token reserves (tokens available for sale on curve)
+    pub real_token_reserves: u64,
+    /// Real SOL reserves (actual SOL deposited by buyers)
+    pub real_sol_reserves: u64,
+    /// Total token supply minted at launch
+    pub token_total_supply: u64,
     /// Total SOL reserve in the curve
     pub reserve_balance: u64,
     /// Whether the token has graduated (hit bonding curve cap)
@@ -69,8 +75,11 @@ impl BondingCurve {
     pub const LEN: usize = 8   // discriminator
         + 32  // token_mint
         + 8   // current_supply
-        + 8   // base_price
-        + 8   // slope
+        + 8   // virtual_token_reserves
+        + 8   // virtual_sol_reserves
+        + 8   // real_token_reserves
+        + 8   // real_sol_reserves
+        + 8   // token_total_supply
         + 8   // reserve_balance
         + 1   // graduated
         + 32  // deployer

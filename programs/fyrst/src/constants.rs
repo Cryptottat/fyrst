@@ -37,6 +37,18 @@ pub const GRADUATION_THRESHOLD: u64 = 5_000_000_000;
 /// Token decimals for SPL tokens
 pub const TOKEN_DECIMALS: u8 = 6;
 
+/// Initial virtual token reserves (pump.fun style, TOKEN_DECIMALS=6)
+pub const INITIAL_VIRTUAL_TOKEN_RESERVES: u64 = 1_073_000_000_000_000;
+
+/// Initial virtual SOL reserves in lamports (30 SOL)
+pub const INITIAL_VIRTUAL_SOL_RESERVES: u64 = 30_000_000_000;
+
+/// Initial real token reserves (tokens available for bonding curve sale)
+pub const INITIAL_REAL_TOKEN_RESERVES: u64 = 793_100_000_000_000;
+
+/// Total token supply (1 billion with 6 decimals)
+pub const TOKEN_TOTAL_SUPPLY: u64 = 1_000_000_000_000_000;
+
 /// Wrapped SOL mint address
 pub const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 

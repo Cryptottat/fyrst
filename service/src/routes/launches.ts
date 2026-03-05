@@ -7,7 +7,7 @@ import { launchLimiter } from "../middleware/rateLimiter";
 import { createLaunchSchema, launchesQuerySchema } from "../schemas";
 import { assignTier, validateCollateral } from "../services/escrow";
 import { computeScore, scoreToRank } from "../services/reputation";
-import { spotPrice } from "../services/bondingCurve";
+import { spotPriceFromSupply } from "../services/bondingCurve";
 import { getIo } from "../socketManager";
 import { CollateralTier, ReputationRank } from "../types";
 
@@ -261,7 +261,7 @@ launchesRouter.post(
           description: description || "",
           imageUrl: imageUrl || "",
           deployerAddress,
-          currentPrice: spotPrice(0),
+          currentPrice: spotPriceFromSupply(0),
           collateralAmount,
           collateralTier: tier,
           deadlineTimestamp,

@@ -36,9 +36,13 @@ const RAYDIUM_CPMM_PROGRAM = new PublicKey(
     : "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C", // mainnet
 );
 
-export const DEFAULT_BASE_PRICE = new BN(100_000); // 0.0001 SOL
-export const DEFAULT_SLOPE = new BN(10);
 export const TOKEN_DECIMALS = 6;
+
+// Constant product AMM initial reserves (pump.fun style)
+export const INITIAL_VIRTUAL_TOKEN_RESERVES = new BN("1073000000000000"); // 1.073B atomic
+export const INITIAL_VIRTUAL_SOL_RESERVES = new BN("30000000000"); // 30 SOL lamports
+export const INITIAL_REAL_TOKEN_RESERVES = new BN("793100000000000"); // 793.1M atomic
+export const TOKEN_TOTAL_SUPPLY_AMM = new BN("1000000000000000"); // 1B atomic
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IDL = idlJson as any;
@@ -134,8 +138,6 @@ export async function launchToken(
   symbol: string,
   uri: string,
   durationSeconds: BN = new BN(86_400),
-  basePrice: BN = DEFAULT_BASE_PRICE,
-  slope: BN = DEFAULT_SLOPE,
 ): Promise<LaunchResult> {
   const provider = program.provider as AnchorProvider;
   const tokenMintKeypair = Keypair.generate();
@@ -144,6 +146,7 @@ export async function launchToken(
   const [escrowVault] = getEscrowPDA(deployer, tokenMint);
   const [bondingCurve] = getCurvePDA(tokenMint);
   const metadataAccount = getMetadataPDA(tokenMint);
+  const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
 
   const methods = program.methods as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -158,21 +161,25 @@ export async function launchToken(
     .instruction();
 
   const curveIx = await methods
-    .initBondingCurve(basePrice, slope, name, symbol, uri)
+    .initBondingCurve(name, symbol, uri)
     .accounts({
       deployer,
       tokenMint,
       bondingCurve,
+      curveTokenAccount,
       metadataAccount,
       metadataProgram: TOKEN_METADATA_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
     .instruction();
 
   // Single TX: escrow + bonding curve (1 wallet signature)
-  const tx = new Transaction().add(escrowIx, curveIx);
+  const tx = new Transaction()
+    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+    .add(escrowIx, curveIx);
   const txSig = await provider.sendAndConfirm(tx, [tokenMintKeypair]);
 
   return { tokenMintKeypair, txSig };
@@ -189,8 +196,6 @@ export async function launchAndBuy(
   buyAmountLamports: BN,
   durationSeconds: BN = new BN(86_400),
   slippageBps: number = DEFAULT_SLIPPAGE_BPS,
-  basePrice: BN = DEFAULT_BASE_PRICE,
-  slope: BN = DEFAULT_SLOPE,
 ): Promise<LaunchResult> {
   const provider = program.provider as AnchorProvider;
   const tokenMintKeypair = Keypair.generate();
@@ -200,6 +205,7 @@ export async function launchAndBuy(
   const [bondingCurve] = getCurvePDA(tokenMint);
   const metadataAccount = getMetadataPDA(tokenMint);
   const [protocolConfig] = getProtocolConfigPDA();
+  const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
   const buyerTokenAccount = getAssociatedTokenAddressSync(tokenMint, deployer);
 
   // Fetch protocol config for treasury address
@@ -219,26 +225,31 @@ export async function launchAndBuy(
     })
     .instruction();
 
-  // IX 2: Init bonding curve
+  // IX 2: Init bonding curve (constant product AMM — no base_price/slope)
   const curveIx = await methods
-    .initBondingCurve(basePrice, slope, name, symbol, uri)
+    .initBondingCurve(name, symbol, uri)
     .accounts({
       deployer,
       tokenMint,
       bondingCurve,
+      curveTokenAccount,
       metadataAccount,
       metadataProgram: TOKEN_METADATA_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
     .instruction();
 
-  // Calculate expected tokens using known initial state (supply = 0)
-  // Total fee = 1% trade fee only (no separate protocol fee)
+  // Calculate expected tokens using known initial reserves
   const tradeFee = buyAmountLamports.mul(new BN(100)).div(new BN(10_000));
   const netSol = buyAmountLamports.sub(tradeFee);
-  const expectedTokens = estimateBuyTokens(basePrice, slope, new BN(0), netSol);
+  const expectedTokens = estimateBuyTokens(
+    INITIAL_VIRTUAL_TOKEN_RESERVES,
+    INITIAL_VIRTUAL_SOL_RESERVES,
+    netSol,
+  );
   const minTokensOut = expectedTokens.muln(10_000 - slippageBps).divn(10_000);
 
   // IX 3: Buy tokens
@@ -248,6 +259,7 @@ export async function launchAndBuy(
       buyer: deployer,
       bondingCurve,
       tokenMint,
+      curveTokenAccount,
       buyerTokenAccount,
       protocolConfig,
       treasury,
@@ -259,62 +271,39 @@ export async function launchAndBuy(
 
   // Single TX: escrow + curve + buy (1 wallet signature)
   const tx = new Transaction()
-    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }))
+    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 600_000 }))
     .add(escrowIx, curveIx, buyIx);
   const txSig = await provider.sendAndConfirm(tx, [tokenMintKeypair]);
 
   return { tokenMintKeypair, txSig };
 }
 
-/** Integer square root (Babylonian method) for BN */
-function bnSqrt(n: BN): BN {
-  if (n.isZero()) return new BN(0);
-  let x = n;
-  let y = x.addn(1).divn(2);
-  while (y.lt(x)) {
-    x = y;
-    y = x.add(n.div(x)).divn(2);
-  }
-  return x;
-}
-
-/** Estimate tokens received for a buy using integral pricing */
+/** Estimate tokens received for a buy using constant product AMM.
+ *  tokens_out = virtualToken - k / (virtualSol + netSol) */
 export function estimateBuyTokens(
-  basePrice: BN,
-  slope: BN,
-  currentSupply: BN,
+  virtualTokenReserves: BN,
+  virtualSolReserves: BN,
   netSolLamports: BN,
 ): BN {
-  const d = new BN(10 ** TOKEN_DECIMALS);
-  if (slope.isZero()) {
-    return netSolLamports.mul(d).div(basePrice);
-  }
-  // Quadratic: slope*T^2 + 2*(base*D + slope*S)*T - 2*net*D^2 = 0
-  // T = (-b + sqrt(b^2 + 4ac)) / (2a)
-  const s = currentSupply;
-  const bp = basePrice;
-  const sl = slope;
-  const b = bp.mul(d).add(sl.mul(s)).muln(2);
-  const cVal = netSolLamports.mul(d).mul(d).muln(2);
-  const disc = b.mul(b).add(sl.muln(4).mul(cVal));
-  const sqrtDisc = bnSqrt(disc);
-  return sqrtDisc.sub(b).div(sl.muln(2));
+  if (netSolLamports.isZero()) return new BN(0);
+  const k = virtualTokenReserves.mul(virtualSolReserves);
+  const newVs = virtualSolReserves.add(netSolLamports);
+  const newVt = k.div(newVs);
+  return virtualTokenReserves.sub(newVt);
 }
 
-/** Estimate SOL received for a sell using integral pricing */
+/** Estimate SOL received for a sell using constant product AMM.
+ *  sol_out = virtualSol - k / (virtualToken + tokenAmount) */
 export function estimateSellSol(
-  basePrice: BN,
-  slope: BN,
-  currentSupply: BN,
+  virtualTokenReserves: BN,
+  virtualSolReserves: BN,
   tokenAmount: BN,
 ): BN {
-  const d = new BN(10 ** TOKEN_DECIMALS);
-  // gross = base*T/D + slope*T*(2S-T) / (2*D^2)
-  const t = tokenAmount;
-  const s = currentSupply;
-  const part1 = basePrice.mul(t).div(d);
-  const part2 = slope.mul(t).mul(s.muln(2).sub(t)).div(d.mul(d).muln(2));
-  return part1.add(part2);
+  if (tokenAmount.isZero()) return new BN(0);
+  const k = virtualTokenReserves.mul(virtualSolReserves);
+  const newVt = virtualTokenReserves.add(tokenAmount);
+  const newVs = k.div(newVt);
+  return virtualSolReserves.sub(newVs);
 }
 
 /** Default slippage tolerance in basis points (1% = 100 bps) */
@@ -344,10 +333,11 @@ export async function buyTokens(
   const tradeFee = solAmountLamports.mul(new BN(100)).div(new BN(10_000));
   const netSol = solAmountLamports.sub(tradeFee);
 
-  // Estimate tokens using integral pricing
-  const expectedTokens = estimateBuyTokens(ca.basePrice, ca.slope, ca.currentSupply, netSol);
+  // Estimate tokens using constant product AMM
+  const expectedTokens = estimateBuyTokens(ca.virtualTokenReserves, ca.virtualSolReserves, netSol);
   const minTokensOut = expectedTokens.muln(10_000 - slippageBps).divn(10_000);
 
+  const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
   const buyerTokenAccount = getAssociatedTokenAddressSync(tokenMint, buyer);
 
   const buyIx = await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -356,6 +346,7 @@ export async function buyTokens(
       buyer,
       bondingCurve,
       tokenMint,
+      curveTokenAccount,
       buyerTokenAccount,
       protocolConfig,
       treasury,
@@ -371,7 +362,7 @@ export async function buyTokens(
   return await provider.sendAndConfirm(tx, []);
 }
 
-/** Sell tokens on a bonding curve — burns SPL tokens */
+/** Sell tokens on a bonding curve — transfers tokens back to curve ATA */
 export async function sellTokens(
   program: FyrstProgram,
   seller: PublicKey,
@@ -383,6 +374,7 @@ export async function sellTokens(
   const [bondingCurve] = getCurvePDA(tokenMint);
   const [protocolConfig] = getProtocolConfigPDA();
   const sellerTokenAccount = getAssociatedTokenAddressSync(tokenMint, seller);
+  const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
 
   // Fetch protocol config for treasury address
   const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -392,10 +384,10 @@ export async function sellTokens(
   const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve); // eslint-disable-line @typescript-eslint/no-explicit-any
   const ca = curveAccount as BondingCurveData;
 
-  // Estimate SOL received using integral pricing (1% total fee)
-  let expectedGross = estimateSellSol(ca.basePrice, ca.slope, ca.currentSupply, tokenAmount);
+  // Estimate SOL received using constant product AMM (1% total fee)
+  let expectedGross = estimateSellSol(ca.virtualTokenReserves, ca.virtualSolReserves, tokenAmount);
 
-  // Cap gross at reserve balance (matches on-chain cap — prevents SlippageExceeded)
+  // Cap gross at reserve balance (matches on-chain cap)
   if (expectedGross.gt(ca.reserveBalance)) {
     expectedGross = ca.reserveBalance;
   }
@@ -411,6 +403,7 @@ export async function sellTokens(
       seller,
       bondingCurve,
       tokenMint,
+      curveTokenAccount,
       sellerTokenAccount,
       protocolConfig,
       treasury,
@@ -419,7 +412,6 @@ export async function sellTokens(
     })
     .instruction();
 
-  // Add compute budget for safety with large amounts
   const tx = new Transaction()
     .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }))
     .add(sellIx);
@@ -593,6 +585,7 @@ export async function graduateToDex(
   tx.add(createSyncNativeInstruction(payerWsolAccount));
 
   // IX 5: graduate_to_dex
+  const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
   const methods = program.methods as any; // eslint-disable-line @typescript-eslint/no-explicit-any
   const graduateIx = await methods
     .graduateToDex()
@@ -600,6 +593,7 @@ export async function graduateToDex(
       payer,
       bondingCurve,
       tokenMint,
+      curveTokenAccount,
       wsolMint: WSOL_MINT,
       payerTokenAccount,
       payerWsolAccount,
@@ -891,8 +885,11 @@ export async function fetchRaydiumPoolPrice(
 export interface BondingCurveData {
   tokenMint: PublicKey;
   currentSupply: BN;
-  basePrice: BN;
-  slope: BN;
+  virtualTokenReserves: BN;
+  virtualSolReserves: BN;
+  realTokenReserves: BN;
+  realSolReserves: BN;
+  tokenTotalSupply: BN;
   reserveBalance: BN;
   graduated: boolean;
   deployer: PublicKey;

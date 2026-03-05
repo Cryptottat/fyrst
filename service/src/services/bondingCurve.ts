@@ -3,53 +3,78 @@ import { logger } from "../utils/logger";
 import { prisma, dbConnected } from "../lib/prisma";
 
 // ---------------------------------------------------------------------------
-// Bonding curve constants
+// Bonding curve constants (pump.fun style constant product AMM)
 // ---------------------------------------------------------------------------
 
-const BASE_PRICE = 0.0001; // SOL per token at supply = 0
-const SLOPE = 0.00000001; // Price increase per unit of supply
-const GRADUATION_RESERVE_SOL = 5; // SOL reserve to graduate (devnet testing — matches on-chain GRADUATION_THRESHOLD)
+const INITIAL_VIRTUAL_TOKEN = 1_073_000_000; // 1.073B tokens (UI units)
+const INITIAL_VIRTUAL_SOL = 30; // 30 SOL
+const INITIAL_REAL_TOKEN = 793_100_000; // 793.1M tokens
+const GRADUATION_RESERVE_SOL = 5; // SOL reserve to graduate (devnet testing)
 
 // ---------------------------------------------------------------------------
-// Pure calculation helpers
+// Pure calculation helpers (constant product AMM: x * y = k)
 // ---------------------------------------------------------------------------
 
 /**
- * Spot price at a given supply level.
- *   price = basePrice + slope * supply
+ * Spot price at given virtual reserves.
+ *   price = virtualSol / virtualToken  (SOL per token)
  */
-export function spotPrice(supply: number): number {
-  return BASE_PRICE + SLOPE * supply;
+export function spotPrice(virtualToken: number, virtualSol: number): number {
+  if (virtualToken === 0) return 0;
+  return virtualSol / virtualToken;
 }
 
 /**
- * Cost to buy `amount` tokens starting from `currentSupply`.
- * Uses integral of the linear bonding curve:
- *   Cost = basePrice * amount + slope * (amount * currentSupply + amount^2 / 2)
+ * Cost to buy `amount` tokens using constant product AMM.
+ *   sol_cost = virtualSol - k / (virtualToken + amount)
+ *   → sol_cost = virtualSol * amount / (virtualToken - amount)  (rearranged)
+ *   Actually: tokens_out for a given sol_in, but here we solve for sol given tokens:
+ *   new_vt = virtualToken - amount
+ *   new_vs = k / new_vt
+ *   sol_cost = new_vs - virtualSol
  */
 export function calculateBuyCost(
-  currentSupply: number,
+  virtualToken: number,
+  virtualSol: number,
   amount: number
 ): number {
-  const cost =
-    BASE_PRICE * amount +
-    SLOPE * (amount * currentSupply + (amount * amount) / 2);
-  return cost;
+  if (amount <= 0 || virtualToken <= amount) return Infinity;
+  const k = virtualToken * virtualSol;
+  const newVt = virtualToken - amount;
+  const newVs = k / newVt;
+  return newVs - virtualSol;
 }
 
 /**
- * SOL received when selling `amount` tokens starting from `currentSupply`.
- * Integral runs from (supply - amount) to supply.
+ * Tokens received for a given SOL input.
+ *   tokens_out = virtualToken - k / (virtualSol + solIn)
+ */
+export function calculateBuyTokens(
+  virtualToken: number,
+  virtualSol: number,
+  solIn: number
+): number {
+  if (solIn <= 0) return 0;
+  const k = virtualToken * virtualSol;
+  const newVs = virtualSol + solIn;
+  const newVt = k / newVs;
+  return virtualToken - newVt;
+}
+
+/**
+ * SOL received when selling `amount` tokens.
+ *   sol_out = virtualSol - k / (virtualToken + amount)
  */
 export function calculateSellReturn(
-  currentSupply: number,
+  virtualToken: number,
+  virtualSol: number,
   amount: number
 ): number {
-  if (amount > currentSupply) {
-    throw new Error("Cannot sell more than current supply");
-  }
-  const newSupply = currentSupply - amount;
-  return calculateBuyCost(newSupply, amount);
+  if (amount <= 0) return 0;
+  const k = virtualToken * virtualSol;
+  const newVt = virtualToken + amount;
+  const newVs = k / newVt;
+  return virtualSol - newVs;
 }
 
 /**
@@ -57,18 +82,19 @@ export function calculateSellReturn(
  * average price for the given trade size.
  */
 export function estimateSlippage(
-  currentSupply: number,
+  virtualToken: number,
+  virtualSol: number,
   amount: number,
   side: "buy" | "sell"
 ): number {
-  const spot = spotPrice(currentSupply);
+  const spot = spotPrice(virtualToken, virtualSol);
   if (spot === 0) return 0;
 
   let totalCost: number;
   if (side === "buy") {
-    totalCost = calculateBuyCost(currentSupply, amount);
+    totalCost = calculateBuyCost(virtualToken, virtualSol, amount);
   } else {
-    totalCost = calculateSellReturn(currentSupply, amount);
+    totalCost = calculateSellReturn(virtualToken, virtualSol, amount);
   }
   const avgPrice = totalCost / amount;
   return Math.abs((avgPrice - spot) / spot) * 100; // percentage
@@ -76,17 +102,38 @@ export function estimateSlippage(
 
 /**
  * Calculate the bonding curve progress towards graduation (0-100).
- * Based on reserve balance vs on-chain GRADUATION_THRESHOLD (85 SOL).
- * Reserve ≈ integral of price over supply = basePrice*S + slope*S^2/2.
+ * Based on real SOL reserves vs graduation threshold.
  */
 export function calculateProgress(
-  currentSupply: number,
-  currentPrice: number
+  realSolReserves: number,
 ): number {
-  // Approximate reserve from integral: basePrice*S + slope*S^2/2
-  const reserve = BASE_PRICE * currentSupply + SLOPE * currentSupply * currentSupply / 2;
-  const progress = (reserve / GRADUATION_RESERVE_SOL) * 100;
+  const progress = (realSolReserves / GRADUATION_RESERVE_SOL) * 100;
   return Math.min(100, progress);
+}
+
+/**
+ * Approximate virtual reserves given current supply (tokens sold).
+ * Uses constant product invariant from initial state.
+ * Not perfectly accurate if sells occurred (path-dependent), but good enough
+ * for display/recording purposes.
+ */
+export function approximateReserves(currentSupply: number): { virtualToken: number; virtualSol: number; realSol: number } {
+  const k = INITIAL_VIRTUAL_TOKEN * INITIAL_VIRTUAL_SOL;
+  const virtualToken = INITIAL_VIRTUAL_TOKEN - currentSupply;
+  if (virtualToken <= 0) {
+    return { virtualToken: 1, virtualSol: k, realSol: GRADUATION_RESERVE_SOL };
+  }
+  const virtualSol = k / virtualToken;
+  const realSol = virtualSol - INITIAL_VIRTUAL_SOL;
+  return { virtualToken, virtualSol, realSol: Math.max(0, realSol) };
+}
+
+/**
+ * Spot price approximated from current supply (convenience wrapper).
+ */
+export function spotPriceFromSupply(currentSupply: number): number {
+  const { virtualToken, virtualSol } = approximateReserves(currentSupply);
+  return spotPrice(virtualToken, virtualSol);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,15 +149,16 @@ export async function getBondingCurveState(
 ): Promise<BondingCurveState> {
   logger.info(`Fetching bonding curve state for token: ${tokenMint}`);
 
+  const defaultState: BondingCurveState = {
+    tokenMint,
+    currentSupply: 0,
+    currentPrice: spotPrice(INITIAL_VIRTUAL_TOKEN, INITIAL_VIRTUAL_SOL),
+    reserveBalance: 0,
+    graduated: false,
+  };
+
   if (!dbConnected()) {
-    // TODO: In Phase 6 this will also query on-chain program accounts
-    return {
-      tokenMint,
-      currentSupply: 0,
-      currentPrice: BASE_PRICE,
-      reserveBalance: 0,
-      graduated: false,
-    };
+    return defaultState;
   }
 
   try {
@@ -119,13 +167,7 @@ export async function getBondingCurveState(
     });
 
     if (!token) {
-      return {
-        tokenMint,
-        currentSupply: 0,
-        currentPrice: BASE_PRICE,
-        reserveBalance: 0,
-        graduated: false,
-      };
+      return defaultState;
     }
 
     return {
@@ -137,12 +179,6 @@ export async function getBondingCurveState(
     };
   } catch (err) {
     logger.error("Failed to fetch bonding curve state", err);
-    return {
-      tokenMint,
-      currentSupply: 0,
-      currentPrice: BASE_PRICE,
-      reserveBalance: 0,
-      graduated: false,
-    };
+    return defaultState;
   }
 }

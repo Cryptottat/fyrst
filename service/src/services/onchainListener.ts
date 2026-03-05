@@ -2,7 +2,7 @@ import { Connection, PublicKey, Logs } from "@solana/web3.js";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { prisma, dbConnected } from "../lib/prisma";
-import { spotPrice, calculateProgress } from "./bondingCurve";
+import { spotPriceFromSupply, calculateProgress, approximateReserves } from "./bondingCurve";
 import { getIo } from "../socketManager";
 import { executeWithRetry } from "./graduationCranker";
 
@@ -230,9 +230,10 @@ async function upsertTradeRecord(
 
   const currentSupply = token.totalSupply;
   const newSupply = side === "buy" ? currentSupply + wholeTokens : Math.max(currentSupply - wholeTokens, 0);
-  const newPrice = spotPrice(newSupply);
+  const newPrice = spotPriceFromSupply(newSupply);
   const newMarketCap = newSupply * newPrice;
-  const progress = calculateProgress(newSupply, newPrice);
+  const { realSol: approxRealSol } = approximateReserves(newSupply);
+  const progress = calculateProgress(approxRealSol);
   const graduated = progress >= 100;
 
   // Record trade (amount = whole tokens, totalSol = SOL)

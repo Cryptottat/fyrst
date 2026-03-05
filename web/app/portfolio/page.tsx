@@ -44,7 +44,7 @@ export default function PortfolioPage() {
               const mintPubkey = new PublicKey(h.tokenMint);
               const curve = await fetchBondingCurve(program, mintPubkey);
               const currentPrice = curve
-                ? curve.basePrice.add(curve.slope.mul(curve.currentSupply)).toNumber() / 1e9
+                ? curve.virtualSolReserves.toNumber() / curve.virtualTokenReserves.toNumber()
                 : h.avgBuyPrice;
               const onChainBalance = h.balance;
               const costBasis = onChainBalance * h.avgBuyPrice;

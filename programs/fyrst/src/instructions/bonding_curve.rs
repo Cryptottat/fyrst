@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_lang::solana_program::{self, program::invoke_signed};
-use anchor_spl::token::{self, Mint, Token, TokenAccount, MintTo, Burn};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, MintTo};
 use anchor_spl::associated_token::AssociatedToken;
 use crate::state::{BondingCurve, ProtocolConfig};
 use crate::errors::FyrstError;
@@ -23,12 +23,6 @@ fn build_create_metadata_v3_ix(
     symbol: String,
     uri: String,
 ) -> solana_program::instruction::Instruction {
-    // Borsh-serialize CreateMetadataAccountV3 instruction data:
-    // discriminator (u8) = 33
-    // DataV2 { name, symbol, uri, seller_fee_basis_points, creators, collection, uses }
-    // is_mutable (bool)
-    // update_authority_is_signer (Option<bool>) = Some(true)
-    // collection_details (Option<CollectionDetails>) = None
     let mut data = vec![33u8]; // CreateMetadataAccountV3
 
     // name (Borsh string = u32 len + bytes)
@@ -76,25 +70,10 @@ fn build_create_metadata_v3_ix(
     }
 }
 
-/// Integer square root via Babylonian method (Newton's method)
-fn isqrt(n: u128) -> u128 {
-    if n == 0 {
-        return 0;
-    }
-    let mut x = n;
-    let mut y = (x + 1) / 2;
-    while y < x {
-        x = y;
-        y = (x + n / x) / 2;
-    }
-    x
-}
-
-/// Initialize bonding curve for a token with SPL mint + metadata
+/// Initialize bonding curve for a token with SPL mint + metadata.
+/// Mints entire token supply to curve ATA (constant product AMM model).
 pub fn init_bonding_curve(
     ctx: Context<InitBondingCurve>,
-    base_price: u64,
-    slope: u64,
     name: String,
     symbol: String,
     uri: String,
@@ -138,12 +117,29 @@ pub fn init_bonding_curve(
         signer_seeds,
     )?;
 
-    // Initialize bonding curve state
+    // Mint entire token supply to curve's ATA
+    token::mint_to(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: ctx.accounts.token_mint.to_account_info(),
+                to: ctx.accounts.curve_token_account.to_account_info(),
+                authority: ctx.accounts.bonding_curve.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        TOKEN_TOTAL_SUPPLY,
+    )?;
+
+    // Initialize bonding curve state (constant product AMM)
     let curve = &mut ctx.accounts.bonding_curve;
     curve.token_mint = ctx.accounts.token_mint.key();
     curve.current_supply = 0;
-    curve.base_price = base_price;
-    curve.slope = slope;
+    curve.virtual_token_reserves = INITIAL_VIRTUAL_TOKEN_RESERVES;
+    curve.virtual_sol_reserves = INITIAL_VIRTUAL_SOL_RESERVES;
+    curve.real_token_reserves = INITIAL_REAL_TOKEN_RESERVES;
+    curve.real_sol_reserves = 0;
+    curve.token_total_supply = TOKEN_TOTAL_SUPPLY;
     curve.reserve_balance = 0;
     curve.graduated = false;
     curve.deployer = ctx.accounts.deployer.key();
@@ -154,24 +150,25 @@ pub fn init_bonding_curve(
     curve.bump = ctx.bumps.bonding_curve;
 
     msg!(
-        "Bonding curve initialized: mint={}, base_price={}, slope={}",
+        "Bonding curve initialized (CPMM): mint={}, virtual_token={}, virtual_sol={}, real_token={}",
         curve.token_mint,
-        base_price,
-        slope
+        INITIAL_VIRTUAL_TOKEN_RESERVES,
+        INITIAL_VIRTUAL_SOL_RESERVES,
+        INITIAL_REAL_TOKEN_RESERVES
     );
 
     Ok(())
 }
 
-/// Buy tokens on the bonding curve — mints real SPL tokens
-/// Uses integral (area-under-curve) pricing to ensure reserve solvency.
+/// Buy tokens on the bonding curve — constant product AMM (x*y=k).
+/// Transfers pre-minted tokens from curve ATA to buyer ATA.
 pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64) -> Result<()> {
-    let tokens;
-    let net_sol;
-    let protocol_fee;
-    let trade_fee;
-    let token_mint_key;
-    let curve_bump;
+    let tokens: u64;
+    let net_sol: u64;
+    let protocol_fee: u64;
+    let trade_fee: u64;
+    let token_mint_key: Pubkey;
+    let curve_bump: u8;
     {
         let curve = &ctx.accounts.bonding_curve;
 
@@ -196,32 +193,16 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
             .checked_sub(protocol_fee)
             .ok_or(FyrstError::MathOverflow)?;
 
-        // Integral pricing (area under the linear bonding curve):
-        // Price curve: P(S) = base_price + slope * (S / D)
-        // Cost to buy T atomic tokens from supply S:
-        //   cost = base_price*T/D + slope*T*(2S+T) / (2*D^2)
-        // Rearranged as quadratic in T:
-        //   slope*T^2 + 2*(base_price*D + slope*S)*T - 2*net_sol*D^2 = 0
-        let d = 10u64.pow(TOKEN_DECIMALS as u32);
-        let s = curve.current_supply as u128;
-        let d128 = d as u128;
-        let bp = curve.base_price as u128;
-        let sl = curve.slope as u128;
-        let net128 = net_sol as u128;
-
-        tokens = if curve.slope == 0 {
-            // Flat pricing: tokens = net_sol * D / base_price
-            require!(curve.base_price > 0, FyrstError::InvalidPrice);
-            (net128 * d128 / bp) as u64
-        } else {
-            let b = 2 * (bp * d128 + sl * s);
-            let c_val = 2 * net128 * d128 * d128;
-            let disc = b * b + 4 * sl * c_val;
-            let sqrt_disc = isqrt(disc);
-            ((sqrt_disc - b) / (2 * sl)) as u64
-        };
+        // Constant product AMM: tokens_out = virtual_token - k / (virtual_sol + net_sol)
+        let vt = curve.virtual_token_reserves as u128;
+        let vs = curve.virtual_sol_reserves as u128;
+        let k = vt.checked_mul(vs).ok_or(FyrstError::MathOverflow)?;
+        let new_vs = vs.checked_add(net_sol as u128).ok_or(FyrstError::MathOverflow)?;
+        let new_vt = k.checked_div(new_vs).ok_or(FyrstError::MathOverflow)?;
+        tokens = vt.checked_sub(new_vt).ok_or(FyrstError::MathOverflow)? as u64;
 
         require!(tokens > 0, FyrstError::InsufficientFunds);
+        require!(tokens <= curve.real_token_reserves, FyrstError::InsufficientTokens);
         require!(tokens >= min_tokens_out, FyrstError::SlippageExceeded);
 
         token_mint_key = curve.token_mint;
@@ -254,7 +235,7 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
         )?;
     }
 
-    // Mint SPL tokens to buyer's ATA
+    // Transfer tokens from curve ATA to buyer ATA
     let seeds = &[
         CURVE_SEED,
         token_mint_key.as_ref(),
@@ -262,11 +243,11 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
     ];
     let signer_seeds = &[&seeds[..]];
 
-    token::mint_to(
+    token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            MintTo {
-                mint: ctx.accounts.token_mint.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.curve_token_account.to_account_info(),
                 to: ctx.accounts.buyer_token_account.to_account_info(),
                 authority: ctx.accounts.bonding_curve.to_account_info(),
             },
@@ -287,6 +268,22 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
 
     // Update curve state
     let curve = &mut ctx.accounts.bonding_curve;
+    curve.virtual_token_reserves = curve
+        .virtual_token_reserves
+        .checked_sub(tokens)
+        .ok_or(FyrstError::MathOverflow)?;
+    curve.virtual_sol_reserves = curve
+        .virtual_sol_reserves
+        .checked_add(net_sol)
+        .ok_or(FyrstError::MathOverflow)?;
+    curve.real_token_reserves = curve
+        .real_token_reserves
+        .checked_sub(tokens)
+        .ok_or(FyrstError::MathOverflow)?;
+    curve.real_sol_reserves = curve
+        .real_sol_reserves
+        .checked_add(net_sol)
+        .ok_or(FyrstError::MathOverflow)?;
     curve.current_supply = curve
         .current_supply
         .checked_add(tokens)
@@ -310,52 +307,48 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
         curve.max_reserve_reached = capped_reserve;
     }
 
-    // Auto-graduation check
-    if curve.reserve_balance >= graduation_threshold {
+    // Auto-graduation check: SOL threshold OR all real tokens sold
+    if curve.reserve_balance >= graduation_threshold || curve.real_token_reserves == 0 {
         curve.graduated = true;
         msg!("Token auto-graduated: mint={}", curve.token_mint);
     }
 
     msg!(
-        "Buy: buyer={}, sol={}, tokens={}, new_supply={}",
+        "Buy: buyer={}, sol={}, tokens={}, new_supply={}, vt={}, vs={}",
         ctx.accounts.buyer.key(),
         sol_amount,
         tokens,
-        curve.current_supply
+        curve.current_supply,
+        curve.virtual_token_reserves,
+        curve.virtual_sol_reserves
     );
 
     Ok(())
 }
 
-/// Sell tokens on the bonding curve — burns SPL tokens
-/// Uses integral pricing to ensure reserve solvency.
+/// Sell tokens on the bonding curve — constant product AMM (x*y=k).
+/// Transfers tokens from seller ATA back to curve ATA.
 pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64) -> Result<()> {
-    let mut net_sol;
-    let mut trade_fee_sell;
-    let mut protocol_fee_sell;
-    let mut gross_sol_final;
+    let net_sol: u64;
+    let trade_fee_sell: u64;
+    let protocol_fee_sell: u64;
+    let gross_sol: u64;
     {
         let curve = &ctx.accounts.bonding_curve;
 
         require!(!curve.graduated, FyrstError::AlreadyGraduated);
         require!(token_amount > 0, FyrstError::InsufficientTokens);
-        require!(
-            curve.current_supply >= token_amount,
-            FyrstError::InsufficientTokens
-        );
 
-        // Integral pricing (area under the curve for sell):
-        // Revenue = base_price*T/D + slope*T*(2S-T) / (2*D^2)
-        // where T = token_amount (atomic), S = current_supply (atomic), D = 10^decimals
-        let d = 10u64.pow(TOKEN_DECIMALS as u32);
-        let t = token_amount as u128;
-        let s = curve.current_supply as u128;
-        let d128 = d as u128;
-        let bp = curve.base_price as u128;
-        let sl = curve.slope as u128;
+        // Constant product AMM: sol_out = virtual_sol - k / (virtual_token + token_amount)
+        let vt = curve.virtual_token_reserves as u128;
+        let vs = curve.virtual_sol_reserves as u128;
+        let k = vt.checked_mul(vs).ok_or(FyrstError::MathOverflow)?;
+        let new_vt = vt.checked_add(token_amount as u128).ok_or(FyrstError::MathOverflow)?;
+        let new_vs = k.checked_div(new_vt).ok_or(FyrstError::MathOverflow)?;
+        let amm_sol_out = vs.checked_sub(new_vs).ok_or(FyrstError::MathOverflow)? as u64;
 
-        let gross_sol = (bp * t / d128
-            + sl * t * (2 * s - t) / (2 * d128 * d128)) as u64;
+        // Cap at real SOL reserves (safety)
+        gross_sol = amm_sol_out.min(curve.real_sol_reserves).min(curve.reserve_balance);
 
         trade_fee_sell = gross_sol
             .checked_mul(TRADE_FEE_BPS)
@@ -375,29 +368,16 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
             .checked_sub(protocol_fee_sell)
             .ok_or(FyrstError::MathOverflow)?;
 
-        // Cap gross at reserve (not just net) — reserve must cover payout + fees
-        gross_sol_final = gross_sol;
-        if gross_sol_final > curve.reserve_balance {
-            gross_sol_final = curve.reserve_balance;
-            trade_fee_sell = gross_sol_final
-                .checked_mul(TRADE_FEE_BPS).ok_or(FyrstError::MathOverflow)?
-                .checked_div(BPS_DENOMINATOR).ok_or(FyrstError::MathOverflow)?;
-            protocol_fee_sell = 0;
-            net_sol = gross_sol_final
-                .checked_sub(trade_fee_sell).ok_or(FyrstError::MathOverflow)?
-                .checked_sub(protocol_fee_sell).ok_or(FyrstError::MathOverflow)?;
-        }
-
         require!(net_sol >= min_sol_out, FyrstError::SlippageExceeded);
     }
 
-    // Burn SPL tokens from seller's ATA
-    token::burn(
+    // Transfer tokens from seller ATA to curve ATA
+    token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
-            Burn {
-                mint: ctx.accounts.token_mint.to_account_info(),
+            token::Transfer {
                 from: ctx.accounts.seller_token_account.to_account_info(),
+                to: ctx.accounts.curve_token_account.to_account_info(),
                 authority: ctx.accounts.seller.to_account_info(),
             },
         ),
@@ -408,7 +388,7 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
     **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= net_sol;
     **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += net_sol;
 
-    // Transfer trade fee share + protocol fee to treasury (from curve PDA) — before mutable borrow
+    // Transfer trade fee share + protocol fee to treasury (from curve PDA)
     let deployer_share = trade_fee_sell / 2;
     let treasury_trade_share = trade_fee_sell.checked_sub(deployer_share).ok_or(FyrstError::MathOverflow)?;
     let total_treasury_sell = treasury_trade_share
@@ -421,13 +401,29 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
 
     // Update curve state — total_sol_collected does NOT decrease
     let curve = &mut ctx.accounts.bonding_curve;
+    curve.virtual_token_reserves = curve
+        .virtual_token_reserves
+        .checked_add(token_amount)
+        .ok_or(FyrstError::MathOverflow)?;
+    curve.virtual_sol_reserves = curve
+        .virtual_sol_reserves
+        .checked_sub(gross_sol)
+        .ok_or(FyrstError::MathOverflow)?;
+    curve.real_token_reserves = curve
+        .real_token_reserves
+        .checked_add(token_amount)
+        .ok_or(FyrstError::MathOverflow)?;
+    curve.real_sol_reserves = curve
+        .real_sol_reserves
+        .checked_sub(gross_sol)
+        .ok_or(FyrstError::MathOverflow)?;
     curve.current_supply = curve
         .current_supply
         .checked_sub(token_amount)
         .ok_or(FyrstError::MathOverflow)?;
     curve.reserve_balance = curve
         .reserve_balance
-        .checked_sub(gross_sol_final)
+        .checked_sub(gross_sol)
         .ok_or(FyrstError::MathOverflow)?;
     curve.total_deployer_fees = curve
         .total_deployer_fees
@@ -435,11 +431,13 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
         .ok_or(FyrstError::MathOverflow)?;
 
     msg!(
-        "Sell: seller={}, tokens={}, sol={}, new_supply={}",
+        "Sell: seller={}, tokens={}, sol={}, new_supply={}, vt={}, vs={}",
         ctx.accounts.seller.key(),
         token_amount,
         net_sol,
-        curve.current_supply
+        curve.current_supply,
+        curve.virtual_token_reserves,
+        curve.virtual_sol_reserves
     );
 
     Ok(())
@@ -467,6 +465,15 @@ pub struct InitBondingCurve<'info> {
     )]
     pub bonding_curve: Account<'info, BondingCurve>,
 
+    /// Curve's token ATA — holds entire token supply for AMM transfers
+    #[account(
+        init,
+        payer = deployer,
+        associated_token::mint = token_mint,
+        associated_token::authority = bonding_curve,
+    )]
+    pub curve_token_account: Account<'info, TokenAccount>,
+
     /// CHECK: Created by Metaplex CPI — validated by the Metaplex program
     #[account(mut)]
     pub metadata_account: UncheckedAccount<'info>,
@@ -476,6 +483,7 @@ pub struct InitBondingCurve<'info> {
     pub metadata_program: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -493,10 +501,17 @@ pub struct BuyTokens<'info> {
     pub bonding_curve: Account<'info, BondingCurve>,
 
     #[account(
-        mut,
         address = bonding_curve.token_mint @ FyrstError::TokenMintMismatch,
     )]
     pub token_mint: Account<'info, Mint>,
+
+    /// Curve's token ATA — source of tokens for transfer
+    #[account(
+        mut,
+        associated_token::mint = token_mint,
+        associated_token::authority = bonding_curve,
+    )]
+    pub curve_token_account: Account<'info, TokenAccount>,
 
     #[account(
         init_if_needed,
@@ -537,10 +552,17 @@ pub struct SellTokens<'info> {
     pub bonding_curve: Account<'info, BondingCurve>,
 
     #[account(
-        mut,
         address = bonding_curve.token_mint @ FyrstError::TokenMintMismatch,
     )]
     pub token_mint: Account<'info, Mint>,
+
+    /// Curve's token ATA — destination for returned tokens
+    #[account(
+        mut,
+        associated_token::mint = token_mint,
+        associated_token::authority = bonding_curve,
+    )]
+    pub curve_token_account: Account<'info, TokenAccount>,
 
     #[account(
         mut,

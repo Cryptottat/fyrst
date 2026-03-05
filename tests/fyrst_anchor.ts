@@ -32,7 +32,7 @@ function getMetadataPDA(mint: PublicKey): PublicKey {
   return pda;
 }
 
-describe("FYRST v13 E2E Tests", () => {
+describe("FYRST CPMM E2E Tests", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
@@ -46,6 +46,7 @@ describe("FYRST v13 E2E Tests", () => {
   let escrowPda: PublicKey;
   let curvePda: PublicKey;
   let protocolConfigPda: PublicKey;
+  let curveTokenAccount: PublicKey;
 
   before(async () => {
     // Derive PDAs
@@ -66,6 +67,12 @@ describe("FYRST v13 E2E Tests", () => {
     [protocolConfigPda] = PublicKey.findProgramAddressSync(
       [Buffer.from("protocol")],
       program.programId
+    );
+
+    curveTokenAccount = getAssociatedTokenAddressSync(
+      tokenMint.publicKey,
+      curvePda,
+      true
     );
 
     // Fund buyer and treasury wallets
@@ -132,7 +139,6 @@ describe("FYRST v13 E2E Tests", () => {
       0.1 * LAMPORTS_PER_SOL
     );
     assert.equal(escrow.released, false);
-    // deadline_timestamp should be created_at + 3600
     assert.equal(
       escrow.deadlineTimestamp.toNumber(),
       escrow.createdAt.toNumber() + 3600
@@ -209,17 +215,13 @@ describe("FYRST v13 E2E Tests", () => {
     }
   });
 
-  // ─── 5. Init Bonding Curve ───────────────────────────────────────
+  // ─── 5. Init Bonding Curve (Constant Product AMM) ────────────────
 
-  it("5. Initialize bonding curve with SPL mint + metadata", async () => {
-    const basePrice = new anchor.BN(100_000);
-    const slope = new anchor.BN(10);
+  it("5. Initialize bonding curve with CPMM + SPL mint + metadata", async () => {
     const metadataAccount = getMetadataPDA(tokenMint.publicKey);
 
     await (program.methods as any)
       .initBondingCurve(
-        basePrice,
-        slope,
         "TestToken",
         "TEST",
         "https://example.com/meta.json"
@@ -228,9 +230,11 @@ describe("FYRST v13 E2E Tests", () => {
         deployer: deployer.publicKey,
         tokenMint: tokenMint.publicKey,
         bondingCurve: curvePda,
+        curveTokenAccount,
         metadataAccount,
         metadataProgram: TOKEN_METADATA_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         rent: SYSVAR_RENT_PUBKEY,
       })
@@ -245,17 +249,25 @@ describe("FYRST v13 E2E Tests", () => {
     assert.equal(curve.currentSupply.toNumber(), 0);
     assert.equal(curve.reserveBalance.toNumber(), 0);
     assert.equal(curve.totalSolCollected.toNumber(), 0);
-    assert.equal(curve.maxReserveReached.toNumber(), 0);
-    assert.equal(curve.totalDeployerFees.toNumber(), 0);
-    assert.equal(curve.claimedDeployerFees.toNumber(), 0);
+
+    // Verify CPMM reserves
+    assert.equal(curve.virtualTokenReserves.toString(), "1073000000000000");
+    assert.equal(curve.virtualSolReserves.toString(), "30000000000");
+    assert.equal(curve.realTokenReserves.toString(), "793100000000000");
+    assert.equal(curve.realSolReserves.toNumber(), 0);
+    assert.equal(curve.tokenTotalSupply.toString(), "1000000000000000");
     assert.equal(curve.graduated, false);
 
-    console.log("  Curve initialized with SPL mint + Metaplex metadata");
+    // Verify all tokens minted to curve ATA
+    const ataInfo = await getAccount(provider.connection, curveTokenAccount);
+    assert.equal(ataInfo.amount.toString(), "1000000000000000");
+
+    console.log("  Curve initialized with CPMM reserves + 1B tokens minted to curve ATA");
   });
 
-  // ─── 6. Buy Tokens (fee split + max_reserve tracking) ───────────
+  // ─── 6. Buy Tokens (CPMM + fee split + max_reserve tracking) ────
 
-  it("6. Buy tokens — verify SPL mint + fee split + max_reserve_reached", async () => {
+  it("6. Buy tokens — verify CPMM transfer + fee split + max_reserve_reached", async () => {
     const buyAmount = new anchor.BN(0.2 * LAMPORTS_PER_SOL);
     const buyerAta = getAssociatedTokenAddressSync(
       tokenMint.publicKey,
@@ -272,6 +284,7 @@ describe("FYRST v13 E2E Tests", () => {
         buyer: buyer.publicKey,
         bondingCurve: curvePda,
         tokenMint: tokenMint.publicKey,
+        curveTokenAccount,
         buyerTokenAccount: buyerAta,
         protocolConfig: protocolConfigPda,
         treasury: treasury.publicKey,
@@ -290,6 +303,14 @@ describe("FYRST v13 E2E Tests", () => {
     assert.isAbove(curve.maxReserveReached.toNumber(), 0);
     assert.equal(curve.claimedDeployerFees.toNumber(), 0);
 
+    // Virtual reserves should have changed
+    assert.isBelow(Number(curve.virtualTokenReserves.toString()), 1073000000000000);
+    assert.isAbove(Number(curve.virtualSolReserves.toString()), 30000000000);
+
+    // Real reserves
+    assert.isBelow(Number(curve.realTokenReserves.toString()), 793100000000000);
+    assert.isAbove(curve.realSolReserves.toNumber(), 0);
+
     // max_reserve_reached should equal reserve_balance after first buy
     assert.equal(
       curve.maxReserveReached.toNumber(),
@@ -302,18 +323,21 @@ describe("FYRST v13 E2E Tests", () => {
     );
     assert.isAbove(treasuryBalAfter, treasuryBalBefore);
 
-    // Verify SPL tokens in buyer ATA
+    // Verify SPL tokens transferred to buyer ATA
     const ataInfo = await getAccount(provider.connection, buyerAta);
     assert.isAbove(Number(ataInfo.amount), 0);
 
     console.log(
       `  Bought: supply=${curve.currentSupply.toNumber()}, reserve=${curve.reserveBalance.toNumber()}, deployer_fees=${curve.totalDeployerFees.toNumber()}, max_reserve=${curve.maxReserveReached.toNumber()}`
     );
+    console.log(
+      `  CPMM: vt=${curve.virtualTokenReserves.toString()}, vs=${curve.virtualSolReserves.toString()}, rt=${curve.realTokenReserves.toString()}, rs=${curve.realSolReserves.toNumber()}`
+    );
   });
 
-  // ─── 7. Sell Tokens (with protocol_config + treasury) ────────────
+  // ─── 7. Sell Tokens (CPMM + transfer back) ──────────────────────
 
-  it("7. Sell tokens — burns SPL + fee split", async () => {
+  it("7. Sell tokens — transfers back to curve ATA + fee split", async () => {
     const curveBefore = await (program.account as any).bondingCurve.fetch(
       curvePda
     );
@@ -334,6 +358,7 @@ describe("FYRST v13 E2E Tests", () => {
         seller: buyer.publicKey,
         bondingCurve: curvePda,
         tokenMint: tokenMint.publicKey,
+        curveTokenAccount,
         sellerTokenAccount: sellerAta,
         protocolConfig: protocolConfigPda,
         treasury: treasury.publicKey,
@@ -366,6 +391,12 @@ describe("FYRST v13 E2E Tests", () => {
       curveBefore.totalDeployerFees.toNumber()
     );
 
+    // Virtual token reserves should increase (tokens returned)
+    assert.isAbove(
+      Number(curveAfter.virtualTokenReserves.toString()),
+      Number(curveBefore.virtualTokenReserves.toString())
+    );
+
     console.log(
       `  Sold ${sellAmount.toNumber()} tokens, supply=${curveAfter.currentSupply.toNumber()}, max_reserve unchanged=${curveAfter.maxReserveReached.toNumber()}`
     );
@@ -393,8 +424,7 @@ describe("FYRST v13 E2E Tests", () => {
     );
 
     if (expectedUnlocked === 0) {
-      // Reserve is too small relative to 85 SOL threshold — skip
-      console.log("  Skipped: unlock amount rounds to 0 (small reserve vs 85 SOL threshold)");
+      console.log("  Skipped: unlock amount rounds to 0 (small reserve vs 5 SOL threshold)");
       return;
     }
 
@@ -411,10 +441,6 @@ describe("FYRST v13 E2E Tests", () => {
     );
     assert.equal(curveAfter.claimedDeployerFees.toNumber(), expectedUnlocked);
 
-    const deployerBalAfter = await provider.connection.getBalance(
-      deployer.publicKey
-    );
-    // Account for tx fee, so just check balance didn't decrease much
     console.log(
       `  Claimed ${expectedUnlocked} lamports, claimedDeployerFees=${curveAfter.claimedDeployerFees.toNumber()}`
     );
@@ -468,10 +494,4 @@ describe("FYRST v13 E2E Tests", () => {
       console.log("  Correctly blocked: deadline (1h) has not passed yet");
     }
   });
-
-  // NOTE: Full refund success test requires clock warp (advancing time past
-  // deadline). Since localnet mocha doesn't easily support clock warp,
-  // we verify the DeadlineNotReached guard above. The burn-to-refund
-  // model ensures: no tokens → no refund (eliminating the exploit).
-
 });

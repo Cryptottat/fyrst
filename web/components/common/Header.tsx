@@ -8,11 +8,12 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
-  { label: "DASHBOARD", href: "/dashboard" },
+  { label: "ABOUT", href: "/about" },
+  { label: "$FYRST", href: "/fyrst-token" },
+  { label: "PLAYER", href: "/dashboard" },
   { label: "LAUNCH", href: "/launch" },
   { label: "BOUNTY", href: "/bounty" },
   { label: "PORTFOLIO", href: "/portfolio" },
-  { label: "ABOUT", href: "/about" },
 ];
 
 export default function Header() {

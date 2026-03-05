@@ -337,11 +337,9 @@ export default function TokenDetailPage({
       .catch(() => setSolBalance(null));
   }, [publicKey, connection, buyStatus, sellStatus]);
 
-  // Price calculation (normalized to match on-chain)
+  // Price calculation: constant product AMM spot price = virtualSol / virtualToken
   const onChainPrice = curveData
-    ? curveData.basePrice
-        .add(curveData.slope.mul(curveData.currentSupply.div(new BN(10 ** TOKEN_DECIMALS))))
-        .toNumber() / 1e9
+    ? curveData.virtualSolReserves.toNumber() / curveData.virtualTokenReserves.toNumber()
     : null;
 
   // On-chain supply is in atomic units (6 decimals) — convert to whole tokens

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{self, program::invoke, program::invoke_signed};
-use anchor_spl::token::{self, Mint, Token, TokenAccount, MintTo, SetAuthority};
+use anchor_lang::solana_program::{self, program::invoke};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, SetAuthority};
 use anchor_spl::associated_token::AssociatedToken;
 use crate::state::BondingCurve;
 use crate::errors::FyrstError;
@@ -46,16 +46,14 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
     let liquidity_sol = reserve_sol - pool_creation_fee;
 
     // 3. Calculate pool tokens from liquidity_sol (reserve minus fee)
-    //    so Raydium pool initial price matches bonding curve final price
-    let d = 10u64.pow(TOKEN_DECIMALS as u32) as u128;
-    let bp = curve.base_price as u128;
-    let sl = curve.slope as u128;
-    let supply = curve.current_supply as u128;
+    //    so Raydium pool initial price matches bonding curve final price.
+    //    Constant product AMM: spot_price = virtual_sol / virtual_token
+    let vt = curve.virtual_token_reserves as u128;
+    let vs = curve.virtual_sol_reserves as u128;
+    require!(vs > 0 && vt > 0, FyrstError::InvalidPrice);
 
-    let spot_price = bp + sl * supply / d;
-    require!(spot_price > 0, FyrstError::InvalidPrice);
-
-    let pool_tokens = ((liquidity_sol as u128) * d / spot_price) as u64;
+    // pool_tokens = liquidity_sol * virtual_token / virtual_sol
+    let pool_tokens = ((liquidity_sol as u128) * vt / vs) as u64;
     require!(pool_tokens > 0, FyrstError::InvalidPrice);
 
     let seeds = &[
@@ -74,12 +72,12 @@ pub fn graduate_to_dex(ctx: Context<GraduateToDex>) -> Result<()> {
         require!(wsol_amount >= liquidity_sol, FyrstError::EmptyReserve);
     }
 
-    // 4. Mint pool tokens to PAYER's token ATA (bonding_curve PDA = mint authority)
-    token::mint_to(
+    // 4. Transfer pool tokens from curve ATA to PAYER's token ATA
+    token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            MintTo {
-                mint: ctx.accounts.token_mint.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.curve_token_account.to_account_info(),
                 to: ctx.accounts.payer_token_account.to_account_info(),
                 authority: ctx.accounts.bonding_curve.to_account_info(),
             },
@@ -267,6 +265,14 @@ pub struct GraduateToDex<'info> {
         address = bonding_curve.token_mint @ FyrstError::TokenMintMismatch,
     )]
     pub token_mint: Account<'info, Mint>,
+
+    /// Curve's token ATA — source of pool tokens
+    #[account(
+        mut,
+        associated_token::mint = token_mint,
+        associated_token::authority = bonding_curve,
+    )]
+    pub curve_token_account: Account<'info, TokenAccount>,
 
     /// WSOL mint (read-only — Raydium CPI reads it)
     pub wsol_mint: Account<'info, Mint>,
