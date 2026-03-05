@@ -168,18 +168,52 @@ export default function TokenDetailPage({
   }, [isDexMode, isDevnet, raydiumPoolAddress]);
 
   // Build external candles for chart: mainnet = GeckoTerminal, devnet = polling history
+  // In DEX mode, prepend bonding curve trades so chart is continuous
   const externalCandles = useMemo<Candle[] | undefined>(() => {
     if (!isDexMode) return undefined;
 
+    // Build bonding curve candles from DB trades (pre-graduation history)
+    const bcCandles: Candle[] = [];
+    if (storeTrades.length > 0) {
+      const bucketMs = 5_000;
+      const sorted = [...storeTrades].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+      let bucket = Math.floor(new Date(sorted[0].createdAt).getTime() / bucketMs) * bucketMs;
+      let o = sorted[0].price, h = o, l = o, c = o;
+
+      for (const t of sorted) {
+        const ts = new Date(t.createdAt).getTime();
+        const b = Math.floor(ts / bucketMs) * bucketMs;
+        if (b !== bucket) {
+          bcCandles.push({ time: Math.floor(bucket / 1000), open: o, high: h, low: l, close: c });
+          bucket = b;
+          o = c;
+          h = Math.max(o, t.price);
+          l = Math.min(o, t.price);
+          c = t.price;
+        } else {
+          h = Math.max(h, t.price);
+          l = Math.min(l, t.price);
+          c = t.price;
+        }
+      }
+      bcCandles.push({ time: Math.floor(bucket / 1000), open: o, high: h, low: l, close: c });
+    }
+
     // Mainnet: GeckoTerminal OHLCV
     if (!isDevnet && dexCandles.length > 0) {
-      return dexCandles.map((c) => ({
+      const dex = dexCandles.map((c) => ({
         time: c.time,
         open: c.open,
         high: c.high,
         low: c.low,
         close: c.close,
       }));
+      // Prepend bonding curve candles before DEX candles (no overlap — bc trades end before dex starts)
+      const lastBcTime = bcCandles.length > 0 ? bcCandles[bcCandles.length - 1].time : 0;
+      const filteredDex = dex.filter((c) => c.time > lastBcTime);
+      return [...bcCandles, ...filteredDex];
     }
 
     // Devnet: aggregate polling priceHistory into 5-second candles
@@ -205,11 +239,17 @@ export default function TokenDetailPage({
         }
       }
       candles.push({ time: bucket, open: o, high: h, low: l, close: c });
-      return candles;
+      // Prepend bonding curve candles
+      const lastBcTime = bcCandles.length > 0 ? bcCandles[bcCandles.length - 1].time : 0;
+      const filteredPolling = candles.filter((c) => c.time > lastBcTime);
+      return [...bcCandles, ...filteredPolling];
     }
 
+    // DEX mode but no polling/gecko data yet — at least show bonding curve history
+    if (bcCandles.length > 0) return bcCandles;
+
     return undefined;
-  }, [isDexMode, isDevnet, dexCandles, priceHistory]);
+  }, [isDexMode, isDevnet, dexCandles, priceHistory, storeTrades]);
 
   // Merge store trades + DEX trades (deduplicated by txSignature)
   const allTrades = useMemo(() => {
