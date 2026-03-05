@@ -260,8 +260,10 @@ export default function FyrstTokenPage() {
               <div className="arcade-border bg-bg p-4 my-4">
                 <p className="text-[10px] font-display text-text-primary mb-3">SCENARIO B: HOLDERS EXIST</p>
                 <div className="ml-2 space-y-1">
-                  <p><span className="text-success">100%</span> → Distributed to token holders <span className="text-text-muted">(pro-rata burn-to-refund)</span></p>
-                  <p className="text-text-muted text-[10px] mt-1">Holders burn their tokens to claim their proportional share of the escrow SOL.</p>
+                  <p><span className="text-success">100%</span> → Claimable by token holders via burn-to-refund</p>
+                  <p className="text-text-muted text-[10px] mt-2">Each holder calls Refund on the token page to burn all their tokens and receive:</p>
+                  <p className="text-text-muted text-[10px] ml-2">(my tokens / total circulating supply) x escrow SOL</p>
+                  <p className="text-text-muted text-[10px] mt-1">No snapshot — calculated in real-time when each holder claims. First come, proportional share.</p>
                 </div>
               </div>
             </div>
