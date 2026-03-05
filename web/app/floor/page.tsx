@@ -17,19 +17,20 @@ import { Search, Clock, Shield } from "lucide-react";
 
 type SortKey = "lastTrade" | "newest" | "marketCap" | "reputation" | "pressure" | "deadline" | "collateral";
 
-/** Format remaining time as compact string */
-function formatRemaining(deadlineStr: string | null): string {
+/** Format remaining time as compact string (with seconds when < 1h) */
+function formatRemaining(deadlineStr: string | null, now: number): string {
   if (!deadlineStr) return "--";
-  const remaining = new Date(deadlineStr).getTime() - Date.now();
+  const remaining = new Date(deadlineStr).getTime() - now;
   if (remaining <= 0) return "EXPIRED";
   const hours = Math.floor(remaining / 3600000);
   const mins = Math.floor((remaining % 3600000) / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
   if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
   if (hours > 0) return `${hours}h ${mins}m`;
-  return `${mins}m`;
+  return `${mins}m ${String(secs).padStart(2, "0")}s`;
 }
 
-function TokenCard({ token, index, flash }: { token: ApiToken; index: number; flash: boolean }) {
+function TokenCard({ token, index, flash, now }: { token: ApiToken; index: number; flash: boolean; now: number }) {
   const score = token.deployer?.reputationScore ?? 50;
   const grade = getReputationGrade(score);
   const tier = token.collateralTier || "Bronze";
@@ -125,7 +126,7 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
         <div className="flex items-center justify-between font-mono border-t border-border/40 pt-2 mt-1">
           <span className="flex items-center gap-1.5 text-xs">
             <Clock className="w-3.5 h-3.5 text-warning" />
-            <span className="text-text-secondary font-display">{formatRemaining(token.deadlineTimestamp)}</span>
+            <span className="text-text-secondary font-display">{formatRemaining(token.deadlineTimestamp, now)}</span>
           </span>
           <span className="flex items-center gap-1.5 text-xs">
             <Shield className="w-3.5 h-3.5 text-primary" />
@@ -185,13 +186,12 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [sort, setTokens]);
 
-  // Tick every second for pressure/deadline sorts
+  // Tick every second for countdown timers
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (sort !== "pressure" && sort !== "deadline") return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [sort]);
+  }, []);
 
   const filtered = useMemo(() => {
     let list = tokens;
@@ -312,6 +312,7 @@ export default function DashboardPage() {
                 token={token}
                 index={i}
                 flash={flashMint === token.mint}
+                now={now}
               />
             ))}
           </div>

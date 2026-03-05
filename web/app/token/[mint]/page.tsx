@@ -105,6 +105,13 @@ export default function TokenDetailPage({
   const [escrowStatus, setEscrowStatus] = useState<TxStatus>("idle");
   const [escrowBalance, setEscrowBalance] = useState<number | null>(null); // lamports
 
+  // Live countdown timer
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // Confirm modal
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -803,7 +810,7 @@ export default function TokenDetailPage({
               />
             </Card>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <Card padding="sm">
                 <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">PRICE (SOL)</p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
@@ -836,6 +843,31 @@ export default function TokenDetailPage({
                 <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">COLLATERAL</p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
                   {formatSol(collateralSol)}
+                </p>
+              </Card>
+              <Card padding="sm">
+                <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">DEADLINE</p>
+                <p className={`text-sm font-score neon-text-subtle ${
+                  (() => {
+                    if (!token?.deadlineTimestamp) return "text-text-primary";
+                    const rem = new Date(token.deadlineTimestamp).getTime() - now;
+                    if (rem <= 0) return "text-error";
+                    if (rem < 300000) return "text-error";
+                    if (rem < 3600000) return "text-warning";
+                    return "text-text-primary";
+                  })()
+                }`}>
+                  {(() => {
+                    if (!token?.deadlineTimestamp) return "\u2014";
+                    const rem = new Date(token.deadlineTimestamp).getTime() - now;
+                    if (rem <= 0) return "EXPIRED";
+                    const h = Math.floor(rem / 3600000);
+                    const m = Math.floor((rem % 3600000) / 60000);
+                    const s = Math.floor((rem % 60000) / 1000);
+                    if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+                    if (h > 0) return `${h}h ${m}m ${String(s).padStart(2, "0")}s`;
+                    return `${m}m ${String(s).padStart(2, "0")}s`;
+                  })()}
                 </p>
               </Card>
             </div>
