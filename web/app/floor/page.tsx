@@ -17,7 +17,7 @@ import { Search, Clock, Shield } from "lucide-react";
 
 type SortKey = "lastTrade" | "newest" | "marketCap" | "reputation" | "pressure" | "deadline" | "collateral";
 
-/** Format remaining time as compact string (with seconds when < 1h) */
+/** Format remaining time as compact string (always shows seconds) */
 function formatRemaining(deadlineStr: string | null, now: number): string {
   if (!deadlineStr) return "--";
   const remaining = new Date(deadlineStr).getTime() - now;
@@ -25,8 +25,8 @@ function formatRemaining(deadlineStr: string | null, now: number): string {
   const hours = Math.floor(remaining / 3600000);
   const mins = Math.floor((remaining % 3600000) / 60000);
   const secs = Math.floor((remaining % 60000) / 1000);
-  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
-  if (hours > 0) return `${hours}h ${mins}m`;
+  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m ${String(secs).padStart(2, "0")}s`;
   return `${mins}m ${String(secs).padStart(2, "0")}s`;
 }
 

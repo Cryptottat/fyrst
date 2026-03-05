@@ -246,8 +246,8 @@ launchesRouter.post(
         data: { reputationScore: score, reputationRank: rank },
       });
 
-      // Compute deadline from durationSeconds (default 24h)
-      const durationSec = typeof durationSeconds === "number" && durationSeconds >= 3600 && durationSeconds <= 604800
+      // Compute deadline from durationSeconds (default 24h, min 60s matches on-chain)
+      const durationSec = typeof durationSeconds === "number" && durationSeconds >= 60 && durationSeconds <= 604800
         ? durationSeconds
         : 86400;
       const deadlineTimestamp = new Date(Date.now() + durationSec * 1000);
@@ -265,6 +265,7 @@ launchesRouter.post(
           collateralAmount,
           collateralTier: tier,
           deadlineTimestamp,
+          lastTradeAt: new Date(),
         },
       });
 
