@@ -338,14 +338,20 @@ export default function TokenDetailPage({
   }, [publicKey, connection, buyStatus, sellStatus]);
 
   // Price calculation: constant product AMM spot price = virtualSol / virtualToken
+  // Convert from lamports/atomic to SOL/whole-token: (lamports / 1e9) / (atomic / 1e6)
   const onChainPrice = curveData
-    ? curveData.virtualSolReserves.toNumber() / curveData.virtualTokenReserves.toNumber()
+    ? (curveData.virtualSolReserves.toNumber() / 1e9) / (curveData.virtualTokenReserves.toNumber() / 1e6)
     : null;
 
   // On-chain supply is in atomic units (6 decimals) — convert to whole tokens
   const onChainSupply = curveData
     ? curveData.currentSupply.toNumber() / 1e6
     : null;
+
+  // Total supply for MCAP calculation (1B fixed, not circulating supply)
+  const totalSupplyForMcap = curveData
+    ? curveData.tokenTotalSupply.toNumber() / 1e6
+    : 1_000_000_000;
 
   // Priority: DEX mode → raydium pool price, else socket > on-chain > API
   const displayPrice = isDexMode
@@ -699,7 +705,7 @@ export default function TokenDetailPage({
               <BondingCurveChart
                 trades={allTrades}
                 currentPrice={displayPrice}
-                totalSupply={displaySupply}
+                totalSupply={totalSupplyForMcap}
                 solPrice={solPrice}
                 externalCandles={externalCandles}
               />
@@ -718,8 +724,8 @@ export default function TokenDetailPage({
                 </p>
                 <p className="text-sm font-score text-text-primary neon-text-subtle">
                   {solPrice > 0
-                    ? `$${formatCompact(displayPrice * displaySupply * solPrice)}`
-                    : `${formatCompact(displayPrice * displaySupply)} SOL`}
+                    ? `$${formatCompact(displayPrice * totalSupplyForMcap * solPrice)}`
+                    : `${formatCompact(displayPrice * totalSupplyForMcap)} SOL`}
                 </p>
               </Card>
               <Card padding="sm">

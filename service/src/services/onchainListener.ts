@@ -231,7 +231,8 @@ async function upsertTradeRecord(
   const currentSupply = token.totalSupply;
   const newSupply = side === "buy" ? currentSupply + wholeTokens : Math.max(currentSupply - wholeTokens, 0);
   const newPrice = spotPriceFromSupply(newSupply);
-  const newMarketCap = newSupply * newPrice;
+  const TOKEN_TOTAL_SUPPLY_UI = 1_000_000_000; // 1B fixed supply for MCAP
+  const newMarketCap = TOKEN_TOTAL_SUPPLY_UI * newPrice;
   const { realSol: approxRealSol } = approximateReserves(newSupply);
   const progress = calculateProgress(approxRealSol);
   const graduated = progress >= 100;

@@ -118,7 +118,8 @@ tradeRouter.post(
       const newPrice = clientPrice || spotPriceFromSupply(newSupply);
       const { virtualToken: slipVt, virtualSol: slipVs } = approximateReserves(currentSupply);
       const slippage = estimateSlippage(slipVt, slipVs, Math.min(amount, Math.max(currentSupply, 1)), side);
-      const newMarketCap = newSupply * newPrice;
+      const TOKEN_TOTAL_SUPPLY_UI = 1_000_000_000; // 1B fixed supply for MCAP
+      const newMarketCap = TOKEN_TOTAL_SUPPLY_UI * newPrice;
       const { realSol: approxRealSol } = approximateReserves(newSupply);
       const progress = calculateProgress(approxRealSol);
       const graduated = progress >= 100;
