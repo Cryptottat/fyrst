@@ -56,7 +56,7 @@ export const TIERS = [
 
 /** Collateral tier definitions */
 export const COLLATERAL_TIERS = [
-  { name: "Iron", amount: 0.1, label: "0.1 SOL" },
+  { name: "Iron", amount: 0.01, label: "0.01 SOL" },
   { name: "Bronze", amount: 0.5, label: "0.5 SOL" },
   { name: "Silver", amount: 1, label: "1 SOL" },
   { name: "Gold", amount: 3, label: "3 SOL" },
@@ -65,7 +65,7 @@ export const COLLATERAL_TIERS = [
 ] as const;
 
 /** Minimum collateral in SOL required to launch a token */
-export const MIN_COLLATERAL = 0.1;
+export const MIN_COLLATERAL = 0.01;
 
 /** Deadline duration presets (seconds) */
 export const DEADLINE_PRESETS = [

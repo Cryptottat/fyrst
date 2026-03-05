@@ -17,8 +17,14 @@ pub mod fyrst {
     pub fn init_protocol(
         ctx: Context<InitProtocol>,
         treasury: Pubkey,
+        ops_wallet: Pubkey,
     ) -> Result<()> {
-        instructions::protocol::init_protocol(ctx, treasury)
+        instructions::protocol::init_protocol(ctx, treasury, ops_wallet)
+    }
+
+    /// Close protocol config for migration (authority only)
+    pub fn close_config(ctx: Context<CloseConfig>) -> Result<()> {
+        instructions::protocol::close_config(ctx)
     }
 
     /// Initialize escrow vault with deployer collateral and custom deadline
@@ -84,6 +90,14 @@ pub mod fyrst {
     /// Claim accumulated trade fees (deployer only)
     pub fn claim_fees(ctx: Context<ClaimFees>) -> Result<()> {
         instructions::protocol::claim_fees(ctx)
+    }
+
+    /// Update operations wallet (authority only)
+    pub fn update_ops_wallet(
+        ctx: Context<UpdateTreasury>,
+        new_ops_wallet: Pubkey,
+    ) -> Result<()> {
+        instructions::protocol::update_ops_wallet(ctx, new_ops_wallet)
     }
 
     /// Update graduation threshold (authority only)

@@ -262,6 +262,10 @@
           "writable": true
         },
         {
+          "name": "ops_wallet",
+          "writable": true
+        },
+        {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
@@ -325,6 +329,51 @@
                 "kind": "account",
                 "path": "bonding_curve.token_mint",
                 "account": "BondingCurve"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_config",
+      "docs": [
+        "Close protocol config for migration (authority only)"
+      ],
+      "discriminator": [
+        145,
+        9,
+        72,
+        157,
+        95,
+        125,
+        61,
+        85
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "protocol_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
               }
             ]
           }
@@ -494,6 +543,10 @@
         },
         {
           "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "ops_wallet",
           "writable": true
         },
         {
@@ -1111,6 +1164,10 @@
         {
           "name": "treasury",
           "type": "pubkey"
+        },
+        {
+          "name": "ops_wallet",
+          "type": "pubkey"
         }
       ]
     },
@@ -1631,6 +1688,10 @@
           "writable": true
         },
         {
+          "name": "ops_wallet",
+          "writable": true
+        },
+        {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
@@ -1696,6 +1757,55 @@
         {
           "name": "new_threshold",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "update_ops_wallet",
+      "docs": [
+        "Update operations wallet (authority only)"
+      ],
+      "discriminator": [
+        144,
+        213,
+        113,
+        210,
+        144,
+        210,
+        90,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "protocol_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_ops_wallet",
+          "type": "pubkey"
         }
       ]
     },
@@ -2091,7 +2201,14 @@
           {
             "name": "treasury",
             "docs": [
-              "Treasury wallet for protocol fee collection"
+              "Treasury wallet for protocol fee collection (buyback+burn)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ops_wallet",
+            "docs": [
+              "Operations wallet for service revenue"
             ],
             "type": "pubkey"
           },

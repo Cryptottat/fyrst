@@ -98,8 +98,10 @@ impl BondingCurve {
 pub struct ProtocolConfig {
     /// Protocol authority (admin operations)
     pub authority: Pubkey,
-    /// Treasury wallet for protocol fee collection
+    /// Treasury wallet for protocol fee collection (buyback+burn)
     pub treasury: Pubkey,
+    /// Operations wallet for service revenue
+    pub ops_wallet: Pubkey,
     /// Graduation threshold in lamports
     pub graduation_threshold: u64,
     /// Bump seed for PDA
@@ -110,6 +112,7 @@ impl ProtocolConfig {
     pub const LEN: usize = 8  // discriminator
         + 32  // authority
         + 32  // treasury
+        + 32  // ops_wallet
         + 8   // graduation_threshold
         + 1;  // bump
 }

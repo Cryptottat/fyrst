@@ -7,17 +7,20 @@ use crate::constants::*;
 pub fn init_protocol(
     ctx: Context<InitProtocol>,
     treasury: Pubkey,
+    ops_wallet: Pubkey,
 ) -> Result<()> {
     let config = &mut ctx.accounts.protocol_config;
     config.authority = ctx.accounts.authority.key();
     config.treasury = treasury;
+    config.ops_wallet = ops_wallet;
     config.graduation_threshold = GRADUATION_THRESHOLD;
     config.bump = ctx.bumps.protocol_config;
 
     msg!(
-        "Protocol initialized: authority={}, treasury={}, threshold={}",
+        "Protocol initialized: authority={}, treasury={}, ops_wallet={}, threshold={}",
         config.authority,
         config.treasury,
+        config.ops_wallet,
         config.graduation_threshold
     );
 
@@ -30,6 +33,15 @@ pub fn update_treasury(ctx: Context<UpdateTreasury>, new_treasury: Pubkey) -> Re
     config.treasury = new_treasury;
 
     msg!("Treasury updated to: {}", new_treasury);
+    Ok(())
+}
+
+/// Update operations wallet (authority only)
+pub fn update_ops_wallet(ctx: Context<UpdateTreasury>, new_ops_wallet: Pubkey) -> Result<()> {
+    let config = &mut ctx.accounts.protocol_config;
+    config.ops_wallet = new_ops_wallet;
+
+    msg!("Ops wallet updated to: {}", new_ops_wallet);
     Ok(())
 }
 
@@ -98,6 +110,35 @@ pub fn graduate(ctx: Context<Graduate>) -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Close protocol config for migration (authority only)
+pub fn close_config(ctx: Context<CloseConfig>) -> Result<()> {
+    let config_info = ctx.accounts.protocol_config.to_account_info();
+    let authority_info = ctx.accounts.authority.to_account_info();
+
+    **authority_info.try_borrow_mut_lamports()? += config_info.lamports();
+    **config_info.try_borrow_mut_lamports()? = 0;
+
+    config_info.assign(&anchor_lang::solana_program::system_program::ID);
+    config_info.realloc(0, false)?;
+
+    msg!("Protocol config closed for migration");
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct CloseConfig<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    /// CHECK: Manual handling due to potential size mismatch during migration
+    #[account(
+        mut,
+        seeds = [PROTOCOL_SEED],
+        bump,
+    )]
+    pub protocol_config: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]

@@ -208,9 +208,10 @@ export async function launchAndBuy(
   const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
   const buyerTokenAccount = getAssociatedTokenAddressSync(tokenMint, deployer);
 
-  // Fetch protocol config for treasury address
+  // Fetch protocol config for treasury + ops_wallet addresses
   const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
   const treasury = configAccount.treasury as PublicKey;
+  const opsWallet = configAccount.opsWallet as PublicKey;
 
   const methods = program.methods as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -263,6 +264,7 @@ export async function launchAndBuy(
       buyerTokenAccount,
       protocolConfig,
       treasury,
+      opsWallet,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
@@ -321,9 +323,10 @@ export async function buyTokens(
   const [bondingCurve] = getCurvePDA(tokenMint);
   const [protocolConfig] = getProtocolConfigPDA();
 
-  // Fetch protocol config for treasury address
+  // Fetch protocol config for treasury + ops_wallet addresses
   const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
   const treasury = configAccount.treasury as PublicKey;
+  const opsWallet = configAccount.opsWallet as PublicKey;
 
   // Fetch current curve state
   const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -350,6 +353,7 @@ export async function buyTokens(
       buyerTokenAccount,
       protocolConfig,
       treasury,
+      opsWallet,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
@@ -376,9 +380,10 @@ export async function sellTokens(
   const sellerTokenAccount = getAssociatedTokenAddressSync(tokenMint, seller);
   const curveTokenAccount = getAssociatedTokenAddressSync(tokenMint, bondingCurve, true);
 
-  // Fetch protocol config for treasury address
+  // Fetch protocol config for treasury + ops_wallet addresses
   const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
   const treasury = configAccount.treasury as PublicKey;
+  const opsWallet = configAccount.opsWallet as PublicKey;
 
   // Fetch curve state for expected SOL calculation
   const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -407,6 +412,7 @@ export async function sellTokens(
       sellerTokenAccount,
       protocolConfig,
       treasury,
+      opsWallet,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
@@ -490,9 +496,10 @@ export async function expireEscrow(
   const [bondingCurve] = getCurvePDA(tokenMint);
   const [protocolConfig] = getProtocolConfigPDA();
 
-  // Fetch protocol config for treasury address
+  // Fetch protocol config for treasury + ops_wallet addresses
   const configAccount = await (program.account as any).protocolConfig.fetch(protocolConfig); // eslint-disable-line @typescript-eslint/no-explicit-any
   const treasury = configAccount.treasury as PublicKey;
+  const opsWallet = configAccount.opsWallet as PublicKey;
 
   return await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
     .expireEscrow()
@@ -502,6 +509,7 @@ export async function expireEscrow(
       bondingCurve,
       protocolConfig,
       treasury,
+      opsWallet,
       systemProgram: SystemProgram.programId,
     })
     .rpc();
@@ -512,11 +520,12 @@ export async function initProtocol(
   program: FyrstProgram,
   authority: PublicKey,
   treasury: PublicKey,
+  opsWallet: PublicKey,
 ): Promise<string> {
   const [protocolConfig] = getProtocolConfigPDA();
 
   return await (program.methods as any) // eslint-disable-line @typescript-eslint/no-explicit-any
-    .initProtocol(treasury)
+    .initProtocol(treasury, opsWallet)
     .accounts({
       authority,
       protocolConfig,
@@ -931,6 +940,7 @@ export interface BondingCurveData {
 export interface ProtocolConfigData {
   authority: PublicKey;
   treasury: PublicKey;
+  opsWallet: PublicKey;
   graduationThreshold: BN;
 }
 

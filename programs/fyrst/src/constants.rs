@@ -1,5 +1,5 @@
-/// Minimum collateral in lamports (0.1 SOL)
-pub const MIN_COLLATERAL: u64 = 100_000_000;
+/// Minimum collateral in lamports (0.01 SOL)
+pub const MIN_COLLATERAL: u64 = 10_000_000;
 
 /// Minimum escrow duration in seconds (1 minute — devnet testing)
 pub const MIN_DURATION: i64 = 60;
@@ -18,6 +18,9 @@ pub const DEPLOYER_FEE_BPS: u64 = 50;
 
 /// Deploy fee in lamports (0.02 SOL)
 pub const DEPLOY_FEE: u64 = 20_000_000;
+
+/// Operations wallet share of treasury fees in basis points (40% = 4000 bps)
+pub const OPS_SHARE_BPS: u64 = 4000;
 
 /// Escrow PDA seed
 pub const ESCROW_SEED: &[u8] = b"escrow";

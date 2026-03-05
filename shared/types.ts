@@ -140,7 +140,7 @@ export interface PaginatedResponse<T> {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-export const MIN_COLLATERAL = 0.1; // SOL
+export const MIN_COLLATERAL = 0.01; // SOL
 export const MIN_DURATION = 3_600; // 1 hour
 export const MAX_DURATION = 604_800; // 7 days
 export const DEPLOY_FEE = 0.02; // SOL

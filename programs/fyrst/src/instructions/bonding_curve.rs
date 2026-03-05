@@ -256,12 +256,24 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
         tokens,
     )?;
 
-    // Transfer remaining trade fee share to treasury (from curve PDA) — before mutable borrow
+    // Split trade fee: 50% deployer, 50% protocol (of which OPS_SHARE_BPS% → ops, rest → treasury)
     let deployer_share = trade_fee / 2;
     let treasury_trade_share = trade_fee.checked_sub(deployer_share).ok_or(FyrstError::MathOverflow)?;
     if treasury_trade_share > 0 {
-        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= treasury_trade_share;
-        **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += treasury_trade_share;
+        let ops_share = treasury_trade_share
+            .checked_mul(OPS_SHARE_BPS)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(BPS_DENOMINATOR)
+            .ok_or(FyrstError::MathOverflow)?;
+        let buyback_share = treasury_trade_share.checked_sub(ops_share).ok_or(FyrstError::MathOverflow)?;
+        if ops_share > 0 {
+            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= ops_share;
+            **ctx.accounts.ops_wallet.to_account_info().try_borrow_mut_lamports()? += ops_share;
+        }
+        if buyback_share > 0 {
+            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= buyback_share;
+            **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += buyback_share;
+        }
     }
 
     let graduation_threshold = ctx.accounts.protocol_config.graduation_threshold;
@@ -388,15 +400,27 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
     **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= net_sol;
     **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += net_sol;
 
-    // Transfer trade fee share + protocol fee to treasury (from curve PDA)
+    // Split trade fee: 50% deployer, 50% protocol (of which OPS_SHARE_BPS% → ops, rest → treasury)
     let deployer_share = trade_fee_sell / 2;
     let treasury_trade_share = trade_fee_sell.checked_sub(deployer_share).ok_or(FyrstError::MathOverflow)?;
-    let total_treasury_sell = treasury_trade_share
+    let total_protocol_sell = treasury_trade_share
         .checked_add(protocol_fee_sell)
         .ok_or(FyrstError::MathOverflow)?;
-    if total_treasury_sell > 0 {
-        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= total_treasury_sell;
-        **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += total_treasury_sell;
+    if total_protocol_sell > 0 {
+        let ops_share = total_protocol_sell
+            .checked_mul(OPS_SHARE_BPS)
+            .ok_or(FyrstError::MathOverflow)?
+            .checked_div(BPS_DENOMINATOR)
+            .ok_or(FyrstError::MathOverflow)?;
+        let buyback_share = total_protocol_sell.checked_sub(ops_share).ok_or(FyrstError::MathOverflow)?;
+        if ops_share > 0 {
+            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= ops_share;
+            **ctx.accounts.ops_wallet.to_account_info().try_borrow_mut_lamports()? += ops_share;
+        }
+        if buyback_share > 0 {
+            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= buyback_share;
+            **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += buyback_share;
+        }
     }
 
     // Update curve state — total_sol_collected does NOT decrease
@@ -527,12 +551,19 @@ pub struct BuyTokens<'info> {
     )]
     pub protocol_config: Account<'info, ProtocolConfig>,
 
-    /// CHECK: Treasury wallet from protocol config
+    /// CHECK: Treasury wallet from protocol config (buyback+burn)
     #[account(
         mut,
         address = protocol_config.treasury @ FyrstError::Unauthorized,
     )]
     pub treasury: UncheckedAccount<'info>,
+
+    /// CHECK: Operations wallet from protocol config (service revenue)
+    #[account(
+        mut,
+        address = protocol_config.ops_wallet @ FyrstError::Unauthorized,
+    )]
+    pub ops_wallet: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -577,12 +608,19 @@ pub struct SellTokens<'info> {
     )]
     pub protocol_config: Account<'info, ProtocolConfig>,
 
-    /// CHECK: Treasury wallet from protocol config
+    /// CHECK: Treasury wallet from protocol config (buyback+burn)
     #[account(
         mut,
         address = protocol_config.treasury @ FyrstError::Unauthorized,
     )]
     pub treasury: UncheckedAccount<'info>,
+
+    /// CHECK: Operations wallet from protocol config (service revenue)
+    #[account(
+        mut,
+        address = protocol_config.ops_wallet @ FyrstError::Unauthorized,
+    )]
+    pub ops_wallet: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

@@ -82,12 +82,25 @@ pub fn expire_escrow(ctx: Context<ExpireEscrow>) -> Result<()> {
     require!(curve.current_supply == 0, FyrstError::TokensStillCirculating);
 
     let collateral = escrow.collateral_amount;
-    let treasury_share = collateral / 2;
+    let protocol_share = collateral / 2;
 
-    // Transfer treasury share from escrow PDA to treasury
+    // Split protocol share: OPS_SHARE_BPS% → ops_wallet, rest → treasury
+    let ops_share = protocol_share
+        .checked_mul(OPS_SHARE_BPS)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_div(BPS_DENOMINATOR)
+        .ok_or(FyrstError::MathOverflow)?;
+    let buyback_share = protocol_share.checked_sub(ops_share).ok_or(FyrstError::MathOverflow)?;
+
     let escrow_info = ctx.accounts.escrow_vault.to_account_info();
-    **escrow_info.try_borrow_mut_lamports()? -= treasury_share;
-    **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += treasury_share;
+    if ops_share > 0 {
+        **escrow_info.try_borrow_mut_lamports()? -= ops_share;
+        **ctx.accounts.ops_wallet.to_account_info().try_borrow_mut_lamports()? += ops_share;
+    }
+    if buyback_share > 0 {
+        **escrow_info.try_borrow_mut_lamports()? -= buyback_share;
+        **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += buyback_share;
+    }
 
     // Close escrow PDA — remaining lamports (deployer_share + rent) go to deployer
     let remaining = escrow_info.lamports();
@@ -99,9 +112,10 @@ pub fn expire_escrow(ctx: Context<ExpireEscrow>) -> Result<()> {
     escrow_info.realloc(0, false)?;
 
     msg!(
-        "Escrow expired: deployer={}, treasury_share={}, deployer_refund={}",
+        "Escrow expired: deployer={}, ops_share={}, buyback_share={}, deployer_refund={}",
         escrow.deployer,
-        treasury_share,
+        ops_share,
+        buyback_share,
         remaining
     );
 
@@ -177,12 +191,19 @@ pub struct ExpireEscrow<'info> {
     )]
     pub protocol_config: Account<'info, ProtocolConfig>,
 
-    /// CHECK: Treasury wallet (receives 50% for buyback+burn)
+    /// CHECK: Treasury wallet (receives buyback share)
     #[account(
         mut,
         constraint = treasury.key() == protocol_config.treasury
     )]
     pub treasury: SystemAccount<'info>,
+
+    /// CHECK: Operations wallet (receives ops share)
+    #[account(
+        mut,
+        constraint = ops_wallet.key() == protocol_config.ops_wallet
+    )]
+    pub ops_wallet: SystemAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }
