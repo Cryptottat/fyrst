@@ -303,7 +303,13 @@ export default function AboutPage() {
               <h2 className="text-[10px] font-display text-primary mb-4 neon-text-subtle">
                 MEET BUSTER
               </h2>
-              <p className="text-3xl mb-4">&#x1F436;</p>
+              <img
+                src="/images/favicon-buster-face-512.png"
+                alt="Buster the Border Collie"
+                width={128}
+                height={128}
+                className="mx-auto mb-4 rounded-lg"
+              />
               <p className="text-xs text-text-secondary font-mono leading-relaxed max-w-md mx-auto">
                 Buster is a Border Collie — the smartest herding dog breed. He
                 sniffs out rugs, herds bad actors, and protects the flock.
