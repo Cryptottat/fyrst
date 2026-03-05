@@ -20,15 +20,15 @@ const feeBreakdown = [
   },
   {
     tag: "02",
-    title: "DEPLOYER SHARE (0.5%)",
+    title: "DEPLOYER SHARE (50%)",
     description:
-      "Half the fee goes directly to the token deployer. Claimable anytime — rewarding builders who launch on FYRST.",
+      "Half of the 1% fee goes directly to the token deployer. Claimable anytime — rewarding builders who launch on FYRST.",
   },
   {
     tag: "03",
-    title: "TREASURY SHARE (0.5%)",
+    title: "TREASURY SHARE (50%)",
     description:
-      "The other half flows to the FYRST treasury. 30% of treasury inflow is used to buy back $FYRST on Jupiter.",
+      "The other half of the fee flows to the FYRST treasury. 30% of treasury inflow is used to buy back $FYRST on Jupiter.",
   },
 ];
 
