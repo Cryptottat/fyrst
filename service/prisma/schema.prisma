@@ -146,3 +146,37 @@ model Comment {
   @@index([createdAt])
   @@map("comments")
 }
+
+// ---------------------------------------------------------------------------
+// Buybacks (treasury buyback+burn history)
+// ---------------------------------------------------------------------------
+model Buyback {
+  id                 String   @id @default(uuid())
+  signature          String   @unique @db.VarChar(128)
+  amountSol          Decimal  @map("amount_sol") @db.Decimal(18, 9)
+  amountTokenBurned  Decimal  @map("amount_token_burned") @db.Decimal(18, 9)
+  timestamp          DateTime
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([timestamp])
+  @@map("buybacks")
+}
+
+// ---------------------------------------------------------------------------
+// Escrow Claims (holder refund claim history)
+// ---------------------------------------------------------------------------
+model EscrowClaim {
+  id             String   @id @default(uuid())
+  signature      String   @unique @db.VarChar(128)
+  tokenMint      String   @map("token_mint") @db.VarChar(64)
+  claimerWallet  String   @map("claimer_wallet") @db.VarChar(64)
+  amountSol      Decimal  @map("amount_sol") @db.Decimal(18, 9)
+  tokensBurned   Decimal  @map("tokens_burned") @db.Decimal(18, 9)
+  timestamp      DateTime
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([tokenMint])
+  @@index([claimerWallet])
+  @@index([timestamp])
+  @@map("escrow_claims")
+}
