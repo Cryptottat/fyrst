@@ -75,12 +75,12 @@ export default function Hero() {
 
       {/* Content */}
       <div className="relative z-10 max-w-2xl mx-auto px-6 text-center">
-        {/* Buster mascot */}
+        {/* Hedgi mascot */}
         <div className="mb-6 flex justify-center">
           <div className="animate-arcade-bob">
             <Image
-              src="/images/buster-hero.png"
-              alt="Buster - The Arcade Guardian"
+              src="/images/hedgi-hero.png"
+              alt="Hedgi - The Arcade Guardian"
               width={180}
               height={180}
               data-pixel=""
@@ -103,7 +103,7 @@ export default function Hero() {
         <div className="arcade-border bg-bg-card/90 p-5 md:p-6 text-left mb-8 max-w-lg mx-auto backdrop-blur-sm">
           <div className="flex items-center gap-2 mb-3 border-b border-border/50 pb-2">
             <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
-            <span className="text-[8px] font-display text-text-muted tracking-wider">BUSTER_TERMINAL v1.0</span>
+            <span className="text-[8px] font-display text-text-muted tracking-wider">HEDGI_TERMINAL v1.0</span>
           </div>
           <p className="text-xs text-text-secondary leading-relaxed font-mono">
             <span className="text-primary">&gt; </span>

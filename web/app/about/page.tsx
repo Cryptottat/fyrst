@@ -297,7 +297,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Buster */}
+        {/* Hedgi */}
         <section className="mb-12">
           <Card padding="lg">
             <div className="text-center">
