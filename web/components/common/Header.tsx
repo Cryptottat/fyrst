@@ -72,7 +72,7 @@ export default function Header() {
         </div>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-5">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -121,7 +121,7 @@ export default function Header() {
         </nav>
 
         {/* Social + Wallet */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-5">
           <a
             href="https://x.com/hedglol"
             target="_blank"
