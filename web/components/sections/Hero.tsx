@@ -58,8 +58,8 @@ export default function Hero() {
         className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(167, 139, 250, 0.6) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(167, 139, 250, 0.6) 1px, transparent 1px)
+            linear-gradient(rgba(212, 168, 83, 0.6) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(212, 168, 83, 0.6) 1px, transparent 1px)
           `,
           backgroundSize: "48px 48px",
         }}
@@ -69,7 +69,7 @@ export default function Hero() {
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-20 blur-3xl pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(167,139,250,0.3) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(212,168,83,0.3) 0%, transparent 70%)",
         }}
       />
 
@@ -84,7 +84,7 @@ export default function Hero() {
               width={180}
               height={180}
               data-pixel=""
-              className="drop-shadow-[0_0_20px_rgba(167,139,250,0.4)]"
+              className="drop-shadow-[0_0_20px_rgba(212,168,83,0.4)]"
               style={{ imageRendering: "pixelated" }}
               priority
             />
@@ -93,7 +93,7 @@ export default function Hero() {
 
         {/* Title */}
         <h1 className="text-xl md:text-3xl font-display text-text-primary tracking-tight mb-2 leading-relaxed">
-          <span className="text-primary neon-text">FYRST</span>
+          <span className="text-primary neon-text">HEDG</span>
         </h1>
         <p className="text-[10px] md:text-xs font-display text-secondary neon-text-subtle mb-8 tracking-widest">
           THE ANTI-CASINO
@@ -125,7 +125,7 @@ export default function Hero() {
               </div>
             </Link>
             <Link href="/floor" className="w-full opacity-0 animate-slide-in" style={{ animationDelay: "0.1s" }} onClick={handleButtonClick}>
-              <div className="arcade-border bg-primary/5 border-primary/60 px-6 py-3.5 flex items-center justify-center gap-3 hover:bg-primary/10 hover:shadow-[0_0_16px_rgba(167,139,250,0.3)] transition-all cursor-pointer group w-full">
+              <div className="arcade-border bg-primary/5 border-primary/60 px-6 py-3.5 flex items-center justify-center gap-3 hover:bg-primary/10 hover:shadow-[0_0_16px_rgba(212,168,83,0.3)] transition-all cursor-pointer group w-full">
                 <span className="text-[10px] font-display text-primary">[ </span>
                 <span className="text-[10px] font-display text-primary neon-text-subtle">SELECT PLAYER (BROWSE)</span>
                 <span className="text-[10px] font-display text-primary"> ]</span>

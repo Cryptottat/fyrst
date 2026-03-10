@@ -9,17 +9,25 @@ import { Menu, X } from "lucide-react";
 
 const navLinks = [
   { label: "ABOUT", href: "/about" },
-  { label: "$FYRST", href: "/fyrst-token" },
+  { label: "$HEDG", href: "/hedg-token" },
   { label: "FLOOR", href: "/floor" },
   { label: "LAUNCH", href: "/launch" },
   { label: "BOUNTY", href: "/bounty" },
   { label: "PORTFOLIO", href: "/portfolio" },
 ];
 
+const onChainLinks = [
+  { label: "BUYBACK LOG", href: "/on-chain/buyback" },
+  { label: "ESCROW CLAIMS", href: "/on-chain/claims" },
+];
+
+const linkStyle = { color: "#F5E6CA", textShadow: "0 0 4px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6)" };
+
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [onChainOpen, setOnChainOpen] = useState(false);
   const wsConnected = useAppStore((s) => s.wsConnected);
 
   useEffect(() => {
@@ -34,9 +42,9 @@ export default function Header() {
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-200",
+        "fixed top-0 left-0 right-0 z-[60] transition-all duration-300 pointer-events-auto",
         scrolled
-          ? "bg-bg/95 backdrop-blur-sm border-b-2 border-border"
+          ? "bg-bg/95 backdrop-blur-md border-b border-border"
           : "bg-transparent",
       )}
     >
@@ -45,9 +53,10 @@ export default function Header() {
         <div className="flex items-center gap-2">
           <Link
             href="/"
-            className="text-xs font-display text-primary hover:text-primary/80 transition-colors neon-text-subtle"
+            className="text-sm font-display transition-colors"
+            style={{ color: "#F5E6CA", textShadow: "0 0 6px rgba(0,0,0,0.9), 0 1px 3px rgba(0,0,0,0.7)" }}
           >
-            FYRST
+            HEDG
           </Link>
           {mounted && (
             <span
@@ -68,20 +77,56 @@ export default function Header() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-[9px] font-display text-text-secondary hover:text-primary transition-colors"
+              className="text-xs font-display transition-colors hover:!text-[#D4A853]"
+              style={linkStyle}
             >
               {link.label}
             </Link>
           ))}
+
+          {/* ON-CHAIN dropdown */}
+          <div
+            className="relative"
+            onMouseEnter={() => setOnChainOpen(true)}
+            onMouseLeave={() => setOnChainOpen(false)}
+          >
+            <button
+              className="text-xs font-display transition-colors hover:!text-[#D4A853] cursor-pointer"
+              style={linkStyle}
+            >
+              ON-CHAIN
+            </button>
+            {onChainOpen && (
+              <div
+                className="absolute top-full left-1/2 -translate-x-1/2 pt-2"
+              >
+                <div
+                  className="min-w-[160px] py-2 border border-border"
+                  style={{ background: "rgba(17,17,21,0.97)", backdropFilter: "blur(12px)" }}
+                >
+                  {onChainLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="block px-4 py-2.5 text-[9px] font-display transition-colors hover:bg-bg-hover hover:!text-[#D4A853]"
+                      style={{ color: "#F5E6CA" }}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* Social + Wallet */}
         <div className="hidden md:flex items-center gap-4">
           <a
-            href="https://x.com/fyrstfun"
+            href="https://x.com/hedglol"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-text-muted hover:text-primary transition-colors"
+            className="text-text-muted hover:text-[#D4A853] transition-colors"
             aria-label="X (Twitter)"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
@@ -89,10 +134,10 @@ export default function Header() {
             </svg>
           </a>
           <a
-            href="https://github.com/fyrst-fun"
+            href="https://github.com/hedg-lol"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-text-muted hover:text-primary transition-colors"
+            className="text-text-muted hover:text-[#D4A853] transition-colors"
             aria-label="GitHub"
           >
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current">
@@ -102,14 +147,14 @@ export default function Header() {
           {mounted && (
             <WalletMultiButton
               style={{
-                backgroundColor: "#A78BFA",
+                backgroundColor: "#D4A853",
                 color: "#0A0A0C",
                 fontFamily: "'Press Start 2P', cursive",
                 fontSize: "0.45rem",
                 height: "2rem",
                 borderRadius: "0",
                 padding: "0 0.75rem",
-                border: "2px solid #C4B5FD",
+                border: "2px solid #F5E6CA",
                 boxShadow: "inset -2px -2px 0px rgba(0,0,0,0.4), inset 2px 2px 0px rgba(255,255,255,0.15)",
               }}
             />
@@ -128,13 +173,26 @@ export default function Header() {
 
       {/* Mobile nav */}
       {mobileOpen && (
-        <div className="md:hidden bg-bg/95 backdrop-blur-sm border-b-2 border-border">
+        <div className="md:hidden bg-bg/95 backdrop-blur-md border-b border-border">
           <nav className="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-4">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-[9px] font-display text-text-secondary hover:text-primary transition-colors"
+                className="text-xs font-display transition-colors hover:!text-[#D4A853]"
+                style={{ color: "#F5E6CA" }}
+                onClick={() => setMobileOpen(false)}
+              >
+                &gt; {link.label}
+              </Link>
+            ))}
+            <p className="text-[8px] font-display text-text-muted mt-2">ON-CHAIN</p>
+            {onChainLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-xs font-display transition-colors hover:!text-[#D4A853] pl-3"
+                style={{ color: "#F5E6CA" }}
                 onClick={() => setMobileOpen(false)}
               >
                 &gt; {link.label}
@@ -143,14 +201,14 @@ export default function Header() {
             {mounted && (
               <WalletMultiButton
                 style={{
-                  backgroundColor: "#A78BFA",
+                  backgroundColor: "#D4A853",
                   color: "#0A0A0C",
                   fontFamily: "'Press Start 2P', cursive",
                   fontSize: "0.45rem",
                   height: "2rem",
                   borderRadius: "0",
                   padding: "0 0.75rem",
-                  border: "2px solid #C4B5FD",
+                  border: "2px solid #F5E6CA",
                   width: "fit-content",
                 }}
               />

@@ -35,7 +35,7 @@ function TokenCard({ token, index }: TokenCardProps) {
 
   return (
     <Link href={`/token/${token.mint}`}>
-      <div className="arcade-border bg-bg-card p-5 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(167,139,250,0.2)] transition-all h-full">
+      <div className="arcade-border bg-bg-card p-5 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(212,168,83,0.2)] transition-all h-full">
         {/* P1 cursor on hover */}
         <div className="absolute -top-2.5 -left-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="text-[8px] font-display text-primary animate-p1 neon-text">P1</span>

@@ -66,6 +66,27 @@ function parseSocial(desc: string): {
   }
 }
 
+// Live countdown timer component to avoid re-rendering the whole page
+function CountdownTimer({ deadlineTimestamp }: { deadlineTimestamp: string | null }) {
+  const [now, setNow] = useState(Date.now());
+  
+  useEffect(() => {
+    if (!deadlineTimestamp) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [deadlineTimestamp]);
+
+  if (!deadlineTimestamp) return <span>&mdash;</span>;
+  const rem = new Date(deadlineTimestamp).getTime() - now;
+  if (rem <= 0) return <span>EXPIRED</span>;
+  const h = Math.floor(rem / 3600000);
+  const m = Math.floor((rem % 3600000) / 60000);
+  const s = Math.floor((rem % 60000) / 1000);
+  if (h >= 24) return <span>{Math.floor(h / 24)}d {h % 24}h</span>;
+  if (h > 0) return <span>{h}h {m}m {String(s).padStart(2, "0")}s</span>;
+  return <span>{m}m {String(s).padStart(2, "0")}s</span>;
+}
+
 export default function TokenDetailPage({
   params,
 }: {
@@ -107,12 +128,7 @@ export default function TokenDetailPage({
   const [refundStatus, setRefundStatus] = useState<TxStatus>("idle");
   const [escrowBalance, setEscrowBalance] = useState<number | null>(null); // lamports
 
-  // Live countdown timer
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Removed global 'now' state to prevent full page re-renders
 
   // Confirm modal
   const [confirmModal, setConfirmModal] = useState<{
@@ -424,7 +440,7 @@ export default function TokenDetailPage({
     if (!publicKey || !signMessage || !commentText.trim()) return;
     setCommentStatus("loading");
     try {
-      const message = `FYRST comment on ${mint}: ${commentText.trim()}`;
+      const message = `HEDG comment on ${mint}: ${commentText.trim()}`;
       const messageBytes = new TextEncoder().encode(message);
       const signatureBytes = await signMessage(messageBytes);
       const signature = bs58.encode(signatureBytes);
@@ -871,24 +887,14 @@ export default function TokenDetailPage({
                 <p className={`text-sm font-score neon-text-subtle ${
                   (() => {
                     if (!token?.deadlineTimestamp) return "text-text-primary";
-                    const rem = new Date(token.deadlineTimestamp).getTime() - now;
+                    const rem = new Date(token.deadlineTimestamp).getTime() - Date.now();
                     if (rem <= 0) return "text-error";
                     if (rem < 300000) return "text-error";
                     if (rem < 3600000) return "text-warning";
                     return "text-text-primary";
                   })()
                 }`}>
-                  {(() => {
-                    if (!token?.deadlineTimestamp) return "\u2014";
-                    const rem = new Date(token.deadlineTimestamp).getTime() - now;
-                    if (rem <= 0) return "EXPIRED";
-                    const h = Math.floor(rem / 3600000);
-                    const m = Math.floor((rem % 3600000) / 60000);
-                    const s = Math.floor((rem % 60000) / 1000);
-                    if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
-                    if (h > 0) return `${h}h ${m}m ${String(s).padStart(2, "0")}s`;
-                    return `${m}m ${String(s).padStart(2, "0")}s`;
-                  })()}
+                  <CountdownTimer deadlineTimestamp={token?.deadlineTimestamp || null} />
                 </p>
               </Card>
             </div>
@@ -1387,7 +1393,7 @@ export default function TokenDetailPage({
                         </span>
                       </div>
                       <p className="text-[8px] text-text-muted mb-2">
-                        Deadline passed with no holders. 50% refund to deployer, 50% to $FYRST buyback+burn.
+                        Deadline passed with no holders. 50% refund to deployer, 50% to $HEDG buyback+burn.
                       </p>
                       <Button
                         variant="primary"

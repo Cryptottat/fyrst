@@ -40,7 +40,7 @@ async function fetchClaimableItems(
 ): Promise<ClaimableItem[]> {
   try {
     const deployer = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "https://fyrst-production.up.railway.app"}/api/deployer/${wallet.toBase58()}`
+      `${process.env.NEXT_PUBLIC_API_URL || "https://api.hedg.lol"}/api/deployer/${wallet.toBase58()}`
     );
     if (!deployer.ok) return [];
     const data = await deployer.json();
@@ -202,15 +202,15 @@ export default function PortfolioPage() {
         {/* Summary */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
           <Card padding="sm">
-            <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">TOTAL VALUE</p>
+            <p className="text-[10px] font-display text-text-muted mb-1 tracking-wider">TOTAL VALUE</p>
             <p className="text-lg font-score text-text-primary neon-text-subtle">{formatSol(totalValue)}</p>
           </Card>
           <Card padding="sm">
-            <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">HOLDINGS</p>
+            <p className="text-[10px] font-display text-text-muted mb-1 tracking-wider">HOLDINGS</p>
             <p className="text-lg font-score text-text-primary neon-text-subtle">{holdings.length}</p>
           </Card>
           <Card padding="sm">
-            <p className="text-[8px] font-display text-text-muted mb-1 tracking-wider">WALLET</p>
+            <p className="text-[10px] font-display text-text-muted mb-1 tracking-wider">WALLET</p>
             <p className="text-[10px] font-mono text-primary truncate neon-text-subtle">{publicKey?.toBase58()}</p>
           </Card>
         </div>
@@ -218,7 +218,7 @@ export default function PortfolioPage() {
         {/* Claimable Escrows & Fees */}
         {claimables.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-[10px] font-display text-primary mb-3 neon-text-subtle tracking-wider">
+            <h2 className="text-xs font-display text-primary mb-3 neon-text-subtle tracking-wider">
               CLAIMABLE REWARDS
             </h2>
             <div className="space-y-2">

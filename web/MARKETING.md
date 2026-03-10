@@ -1,12 +1,13 @@
-# FYRST Marketing Strategy & Copy
+# HEDG Marketing Strategy & Copy
 
 ## Brand Identity
 
-**Name:** FYRST ($FYRST)
+**Name:** HEDG ($HEDG)
 **Tagline:** "The Anti-Casino"
 **Secondary tagline:** "Launch safe. Buy confident."
 **Theme:** Retro arcade / 80-90s game aesthetic
-**Mascot:** Buster (pixel art border collie with purple bandana)
+**Mascot:** Hedgi (pixel art hedgehog — defensive spines = escrow protection)
+**Colors:** Gold (#D4A853) + Cream (#F5E6CA) + Dark (#0A0A0C)
 
 ---
 
@@ -20,16 +21,15 @@
 - Track bonding curve progress in real-time
 - Filter by collateral tier, reputation grade, market cap
 
-**Target Audience:** Solana degen traders, pump.fun active users, memecoin communities
+**Target Audience:** Solana degen traders, memecoin communities
 
 **Hook Message:**
 > "Stop gambling blind. Check any deployer's track record before you ape."
 
 **Distribution Channels:**
-1. **Crypto Twitter (X)** — @fyrstfun thread launches
-2. **Telegram** — t.me/fyrstfun group + bot alerts
-3. **Reddit** — r/solana, r/CryptoMoonShots, r/SolanaMemecoin
-4. **Discord** — Solana ecosystem servers, DeFi communities
+1. **Crypto Twitter (X)** — @hedglol thread launches
+2. **Reddit** — r/solana, r/CryptoMoonShots, r/SolanaMemecoin
+3. **Discord** — Solana ecosystem servers, DeFi communities
 
 **Key Metric:** DAU on dashboard, deployer profile page views
 
@@ -42,7 +42,7 @@
 **Value Proposition:**
 - Launch tokens with mandatory collateral escrow
 - Bonding curve pricing (no LP manipulation)
-- Auto-refund if deployer rugs within 24h
+- Auto-refund if deployer rugs — buyers burn tokens to claim escrow SOL
 - Cross-wallet reputation that follows you forever
 
 **Hook Message:**
@@ -60,7 +60,7 @@
 
 **Tweet 1 (Main):**
 ```
-FYRST: The Anti-Casino.
+HEDG: The Anti-Casino.
 
 Every token launch on Solana is a slot machine.
 We built an arcade instead.
@@ -71,28 +71,28 @@ We built an arcade instead.
 
 Launch safe. Buy confident.
 
-fyrst.fun
+hedg.lol
 ```
 
 **Tweet 2:**
 ```
-HOW TO PLAY:
+HOW IT WORKS:
 
 STEP 1: INSERT COIN
-Deployers lock SOL as collateral. Bronze (1 SOL) to Diamond (25+ SOL).
+Deployers lock SOL as collateral before their token goes live.
 
 STEP 2: PLAYER PROFILE
-Your wallet = your save file. Every launch, every trade, tracked on-chain.
+Your wallet = your permanent record. Every launch, every trade, tracked on-chain.
 
 STEP 3: 1UP GUARANTEE
-Dev rage-quits? Buyers get auto-refunded. Continue? 9... 8... 7...
+Dev disappears? Burn your tokens → claim your share of the escrow. Automatic.
 ```
 
 **Tweet 3:**
 ```
 VERSUS MODE:
 
-              Casino    vs    FYRST
+              Casino    vs    HEDG
 Accountability  lol no        Collateral staked
 Identity        anon devs     Cross-wallet rep
 Rug Protection  rug & run     Auto refunds
@@ -111,33 +111,13 @@ No wallet needed to look.
 
 INSERT COIN TO CONTINUE.
 
-fyrst.fun/dashboard
-```
-
-### Telegram Welcome Message
-```
-Welcome to FYRST Arcade.
-
-No rugs. No casino BS. Just pure gameplay.
-
-What we do:
-- Deployers must stake SOL to launch tokens
-- Every wallet has a public reputation score
-- Rug = auto-refund to buyers
-- Bonding curve pricing, no LP manipulation
-
-Commands:
-/dashboard - Browse live launches
-/launch - Deploy a token
-/docs - Read the whitepaper
-
-INSERT COIN TO CONTINUE.
+hedg.lol
 ```
 
 ### One-liner Descriptions
 - **Bio:** "The Anti-Casino. Fair token launches on Solana."
-- **Short:** "Deployer collateral + cross-wallet reputation + auto-refunds = FYRST."
-- **Long:** "FYRST is a Solana token launchpad that requires deployers to stake collateral, tracks reputation across wallets, and automatically refunds buyers if a rug pull is detected."
+- **Short:** "Deployer collateral + cross-wallet reputation + auto-refunds = HEDG."
+- **Long:** "HEDG is a Solana token launchpad that requires deployers to stake collateral, tracks reputation across wallets, and automatically refunds buyers when a rug pull is detected."
 
 ### Call-to-Actions
 - "INSERT COIN (Launch a Token)" — Primary CTA
@@ -151,24 +131,24 @@ INSERT COIN TO CONTINUE.
 ## Content Calendar (Week 1-4)
 
 ### Week 1: Awareness
-- Day 1: Launch thread (4-tweet thread)
-- Day 2: Mascot reveal (Buster the border collie)
+- Day 1: Launch thread (4-tweet thread) + banner image
+- Day 2: Mascot reveal (Hedgi the hedgehog)
 - Day 3: "VERSUS MODE" comparison graphic
 - Day 4: Dashboard walkthrough video/GIF
-- Day 5-7: Community engagement, reply to rug complaints with "FYRST fixes this"
+- Day 5-7: Community engagement, reply to rug complaints with "HEDG fixes this"
 
 ### Week 2: Education
 - Day 1: "How collateral escrow works" thread
 - Day 2: "What is cross-wallet reputation?" explainer
-- Day 3: "The 1UP Guarantee" — auto-refund deep dive
+- Day 3: "Burn-to-Refund" — escrow protection deep dive
 - Day 4: First mock launch walkthrough
 - Day 5-7: Engage Solana CT influencers
 
 ### Week 3: Community Building
-- Day 1: Telegram group launch
-- Day 2: "Rate your deployer" community challenge
-- Day 3: Collateral tier breakdown infographic
-- Day 4: Weekly "HIGH SCORES" stats recap
+- Day 1: "Rate your deployer" community challenge
+- Day 2: Collateral tier breakdown infographic
+- Day 3: Weekly "HIGH SCORES" stats recap
+- Day 4: On-chain transparency page showcase (buyback log + escrow claims)
 - Day 5-7: Partnership outreach (Solana projects, DEXs)
 
 ### Week 4: Mainnet Prep
@@ -182,11 +162,11 @@ INSERT COIN TO CONTINUE.
 
 ## Key Differentiators to Emphasize
 
-1. **Collateral = Skin in the game** — Unlike pump.fun where anyone can deploy free, FYRST requires SOL lockup
+1. **Collateral = Skin in the game** — Deployers must lock SOL to launch. No free rugs.
 2. **Reputation is permanent** — Cross-wallet tracking means no fresh-wallet rugs
-3. **Auto-refunds** — First launchpad with automatic rug protection (24h safe period)
-4. **Bonding curve** — Fair pricing, no LP manipulation, transparent graduation
-5. **On-chain everything** — Full transparency, verifiable on Solana explorer
+3. **Burn-to-Refund** — Buyers burn tokens to claim their share of escrow SOL when launches fail
+4. **Bonding curve** — Fair pricing, no LP manipulation, transparent graduation to Raydium
+5. **On-chain everything** — Full transparency, buyback logs and escrow claims verifiable on Solscan
 
 ---
 
@@ -195,7 +175,6 @@ INSERT COIN TO CONTINUE.
 | Metric | Target (Month 1) | Target (Month 3) |
 |--------|------------------|------------------|
 | Twitter followers | 1,000 | 10,000 |
-| Telegram members | 500 | 5,000 |
 | DAU (dashboard) | 100 | 1,000 |
 | Tokens launched | 50 | 500 |
 | SOL locked | 100 | 2,000 |

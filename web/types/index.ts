@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// FYRST Core Type Definitions
+// HEDG Core Type Definitions
 // ---------------------------------------------------------------------------
 
-/** Represents a launched token on the FYRST platform. */
+/** Represents a launched token on the HEDG platform. */
 export interface Token {
   mint: string;
   name: string;

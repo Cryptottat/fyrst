@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// FYRST Project Constants
+// HEDG Project Constants
 // ---------------------------------------------------------------------------
 
 /** Design system color tokens — Midnight Studio palette */
@@ -8,7 +8,7 @@ export const COLORS = {
   bgCard: "#141417",
   bgElevated: "#1C1C21",
   bgHover: "#232329",
-  primary: "#A78BFA",
+  primary: "#D4A853",
   secondary: "#FB923C",
   accent: "#34D399",
   success: "#34D399",

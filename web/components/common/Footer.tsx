@@ -4,16 +4,15 @@ import Link from "next/link";
 
 const footerLinks = [
   { label: "About", href: "/about" },
-  { label: "$FYRST", href: "/fyrst-token" },
+  { label: "$HEDG", href: "/hedg-token" },
   { label: "Floor", href: "/floor" },
   { label: "Launch", href: "/launch" },
-  { label: "Docs", href: "https://github.com/fyrst-fun/fyrst#readme" },
+  { label: "Docs", href: "https://github.com/hedg-lol/hedg#readme" },
 ];
 
 const socialLinks = [
-  { label: "X", href: "https://x.com/fyrstfun" },
-  { label: "GitHub", href: "https://github.com/fyrst-fun" },
-  { label: "Telegram", href: "https://t.me/fyrstfun" },
+  { label: "X", href: "https://x.com/hedglol" },
+  { label: "GitHub", href: "https://github.com/hedg-lol" },
 ];
 
 export default function Footer() {
@@ -24,7 +23,7 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <Link href="/" className="text-xs font-display text-primary neon-text-subtle">
-              FYRST
+              HEDG
             </Link>
             <p className="text-xs text-text-muted mt-3 max-w-xs leading-relaxed font-mono">
               <span className="text-primary">&gt; </span>
@@ -42,7 +41,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-xs text-text-muted hover:text-primary transition-colors font-mono"
+                    className="text-xs text-text-muted hover:text-[#D4A853] transition-colors font-mono"
                   >
                     &gt; {link.label}
                   </Link>
@@ -63,7 +62,7 @@ export default function Footer() {
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-text-muted hover:text-primary transition-colors font-mono"
+                    className="text-xs text-text-muted hover:text-[#D4A853] transition-colors font-mono"
                   >
                     &gt; {link.label}
                   </a>
@@ -75,7 +74,7 @@ export default function Footer() {
 
         <div className="border-t-2 border-border pt-6 flex items-center justify-between">
           <p className="text-[8px] font-display text-text-muted">
-            &copy; {new Date().getFullYear()} FYRST PROTOCOL
+            &copy; {new Date().getFullYear()} HEDG PROTOCOL
           </p>
           <p className="text-[8px] font-display text-text-muted animate-blink">
             INSERT COIN TO CONTINUE

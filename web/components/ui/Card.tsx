@@ -29,7 +29,7 @@ export default function Card({
       className={cn(
         "bg-bg-card arcade-border",
         paddingStyles[padding],
-        hover && "group/card transition-all duration-100 hover:border-primary hover:shadow-[0_0_16px_rgba(167,139,250,0.25),0_0_32px_rgba(167,139,250,0.1)]",
+        hover && "group/card transition-all duration-100 hover:border-primary hover:shadow-[0_0_16px_rgba(212,168,83,0.25),0_0_32px_rgba(212,168,83,0.1)]",
         className,
       )}
       {...props}

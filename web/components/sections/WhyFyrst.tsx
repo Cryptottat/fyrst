@@ -4,31 +4,31 @@ const comparisons = [
   {
     feature: "Accountability",
     other: "lol no",
-    fyrst: "Collateral staked",
+    hedg: "Collateral staked",
   },
   {
     feature: "Identity",
     other: "anon devs",
-    fyrst: "Cross-wallet rep",
+    hedg: "Cross-wallet rep",
   },
   {
     feature: "Rug Protection",
     other: "rug & run",
-    fyrst: "Auto refunds",
+    hedg: "Auto refunds",
   },
   {
     feature: "Transparency",
     other: "hidden history",
-    fyrst: "Full on-chain",
+    hedg: "Full on-chain",
   },
   {
     feature: "Vibes",
     other: "casino",
-    fyrst: "ARCADE",
+    hedg: "ARCADE",
   },
 ];
 
-export default function WhyFyrst() {
+export default function WhyHedg() {
   return (
     <section className="py-20 px-6 bg-bg-card/30">
       <div className="max-w-3xl mx-auto">
@@ -53,7 +53,7 @@ export default function WhyFyrst() {
               VS
             </div>
             <div className="text-[8px] font-display text-primary text-center neon-text-subtle">
-              FYRST ARCADE
+              HEDG ARCADE
             </div>
           </div>
 
@@ -75,7 +75,7 @@ export default function WhyFyrst() {
                 VS
               </div>
               <div className="text-xs text-primary text-center font-medium font-mono neon-text-subtle">
-                {row.fyrst}
+                {row.hedg}
               </div>
             </div>
           ))}

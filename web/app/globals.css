@@ -5,8 +5,8 @@
   --color-bg-card: #111115;
   --color-bg-elevated: #1A1A20;
   --color-bg-hover: #222228;
-  --color-primary: #A78BFA;
-  --color-primary-dim: #7C3AED;
+  --color-primary: #D4A853;
+  --color-primary-dim: #8B6914;
   --color-secondary: #FB923C;
   --color-accent: #34D399;
   --color-success: #34D399;
@@ -42,7 +42,6 @@ body {
       rgba(0, 0, 0, 0.06) 2px,
       rgba(0, 0, 0, 0.06) 4px
     );
-  box-shadow: inset 0 0 120px 40px rgba(0, 0, 0, 0.7);
 }
 
 /* ── Pixel-perfect images ─────────────────────────────────────── */
@@ -62,15 +61,15 @@ img[data-pixel] {
   border: 2px solid var(--color-primary);
   box-shadow:
     inset -2px -2px 0 0 var(--color-primary-dim),
-    inset 2px 2px 0 0 rgba(199, 181, 253, 0.3),
-    0 0 12px rgba(167, 139, 250, 0.15);
+    inset 2px 2px 0 0 rgba(245, 230, 202, 0.3),
+    0 0 12px rgba(212, 168, 83, 0.15);
 }
 
 .arcade-border-active {
   border: 2px solid var(--color-primary);
   box-shadow:
-    0 0 16px rgba(167, 139, 250, 0.3),
-    0 0 32px rgba(167, 139, 250, 0.1);
+    0 0 16px rgba(212, 168, 83, 0.3),
+    0 0 32px rgba(212, 168, 83, 0.1);
 }
 
 /* ── Chunky Arcade Button ─────────────────────────────────────── */
@@ -144,9 +143,9 @@ img[data-pixel] {
 
 /* ── Card Flash (LAST TRADE sort) ─────────────────────────────── */
 @keyframes card-flash {
-  0% { box-shadow: 0 0 0 rgba(167, 139, 250, 0); border-color: var(--color-primary); }
-  20% { box-shadow: 0 0 30px rgba(167, 139, 250, 0.6), 0 0 60px rgba(167, 139, 250, 0.3); border-color: var(--color-primary); }
-  100% { box-shadow: 0 0 0 rgba(167, 139, 250, 0); border-color: var(--color-border); }
+  0% { box-shadow: 0 0 0 rgba(212, 168, 83, 0); border-color: var(--color-primary); }
+  20% { box-shadow: 0 0 30px rgba(212, 168, 83, 0.6), 0 0 60px rgba(212, 168, 83, 0.3); border-color: var(--color-primary); }
+  100% { box-shadow: 0 0 0 rgba(212, 168, 83, 0); border-color: var(--color-border); }
 }
 .animate-card-flash {
   animation: card-flash 1.5s ease-out 1;
@@ -182,7 +181,7 @@ img[data-pixel] {
 
 /* ── Selection color ──────────────────────────────────────────── */
 ::selection {
-  background: rgba(167, 139, 250, 0.3);
+  background: rgba(212, 168, 83, 0.3);
   color: #fff;
 }
 

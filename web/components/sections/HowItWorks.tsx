@@ -44,7 +44,7 @@ export default function HowItWorks() {
           {steps.map((step, i) => (
             <div
               key={step.title}
-              className="arcade-border bg-bg-card p-6 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(167,139,250,0.15)] transition-all"
+              className="arcade-border bg-bg-card p-6 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(212,168,83,0.15)] transition-all"
             >
               {/* Step number badge */}
               <div className="absolute -top-3 left-4 bg-bg-card px-2">
@@ -62,7 +62,7 @@ export default function HowItWorks() {
                   height={64}
                   style={{ imageRendering: "pixelated" }}
                   data-pixel=""
-                  className="drop-shadow-[0_0_12px_rgba(167,139,250,0.3)]"
+                  className="drop-shadow-[0_0_12px_rgba(212,168,83,0.3)]"
                 />
               </div>
 

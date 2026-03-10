@@ -52,11 +52,11 @@ const journeySteps = [
 ];
 
 const comparisons = [
-  { feature: "Deployer Cost", pump: "0 SOL", fyrst: "Collateral required" },
-  { feature: "Rug Protection", pump: "None", fyrst: "Auto-refund" },
-  { feature: "Reputation", pump: "Anonymous", fyrst: "Cross-wallet tracking" },
-  { feature: "LP After Grad", pump: "Unlocked", fyrst: "Permanently locked" },
-  { feature: "Transparency", pump: "Partial", fyrst: "Fully on-chain" },
+  { feature: "Deployer Cost", pump: "0 SOL", hedg: "Collateral required" },
+  { feature: "Rug Protection", pump: "None", hedg: "Auto-refund" },
+  { feature: "Reputation", pump: "Anonymous", hedg: "Cross-wallet tracking" },
+  { feature: "LP After Grad", pump: "Unlocked", hedg: "Permanently locked" },
+  { feature: "Transparency", pump: "Partial", hedg: "Fully on-chain" },
 ];
 
 const roadmap = [
@@ -78,7 +78,7 @@ const roadmap = [
   },
   {
     status: "NEXT",
-    title: "$FYRST Governance Token",
+    title: "$HEDG Governance Token",
     detail: "Community governance over protocol parameters and treasury.",
   },
 ];
@@ -89,10 +89,10 @@ export default function AboutPage() {
       <div className="max-w-4xl mx-auto">
         {/* Hero */}
         <div className="mb-12 text-center">
-          <h1 className="text-sm md:text-base font-display text-text-primary mb-4 leading-relaxed">
-            ABOUT FYRST
+          <h1 className="text-2xl md:text-4xl font-display text-text-primary mb-4 leading-relaxed neon-text-subtle">
+            ABOUT HEDG
           </h1>
-          <p className="text-sm text-text-secondary font-mono max-w-xl mx-auto leading-relaxed">
+          <p className="text-sm md:text-base text-text-secondary font-mono max-w-xl mx-auto leading-relaxed">
             <span className="text-primary">&gt; </span>
             The first responsible token launchpad on Solana.
             <br />
@@ -100,23 +100,34 @@ export default function AboutPage() {
           </p>
         </div>
 
-        {/* What is FYRST */}
+        {/* What is HEDG */}
         <section className="mb-12">
           <Card padding="lg">
-            <h2 className="text-[10px] font-display text-primary mb-4 neon-text-subtle">
-              WHAT IS FYRST?
+            <h2 className="text-sm md:text-base font-display text-primary mb-4 neon-text-subtle">
+              WHAT IS HEDG?
             </h2>
-            <div className="space-y-3 text-xs text-text-secondary font-mono leading-relaxed">
+            <div className="space-y-4 text-sm text-text-secondary font-mono leading-relaxed">
               <p>
-                FYRST is a Solana token launchpad built for traders who are tired
-                of getting rugged. Every launch on FYRST requires deployer
-                collateral, tracks cross-wallet reputation, and offers automatic
-                refunds when things go wrong.
+                The memecoin ecosystem is broken. An estimated 89% of tokens die
+                within 24 hours of launch. Deployers face zero consequences —
+                they create a token for free, pump it, dump on buyers, and
+                vanish. Buyers absorb all the risk while deployers walk away
+                with the profits. This cycle repeats thousands of times a day.
               </p>
               <p>
-                Think of it as pump.fun — but with accountability. Deployers
-                can&apos;t just create a token for free, dump on buyers, and
-                disappear. On FYRST, they have skin in the game.
+                HEDG is the first launchpad that flips this dynamic. Every
+                launch on HEDG requires the deployer to lock SOL collateral in
+                escrow before a single token is minted. Think of it as a
+                memecoin launchpad — but with real accountability. If the token
+                fails and the deployer abandons it, that collateral flows back
+                to the buyers who got burned.
+              </p>
+              <p>
+                But collateral alone isn&apos;t enough. Bad actors just create
+                new wallets. That&apos;s why HEDG tracks deployer reputation
+                across wallets — past rugs, successful launches, and behavioral
+                patterns are all scored and surfaced so buyers can make informed
+                decisions before they ape in.
               </p>
               <p>
                 Tokens launch on a bonding curve, and once they hit the
@@ -131,7 +142,7 @@ export default function AboutPage() {
         {/* Core Features */}
         <section className="mb-12">
           <div className="text-center mb-8">
-            <h2 className="text-xs font-display text-text-primary mb-2 leading-relaxed">
+            <h2 className="text-lg md:text-xl font-display text-text-primary mb-2 leading-relaxed">
               CORE MECHANICS
             </h2>
             <p className="text-sm text-text-secondary font-mono">
@@ -144,17 +155,17 @@ export default function AboutPage() {
             {coreFeatures.map((f) => (
               <div
                 key={f.tag}
-                className="arcade-border bg-bg-card p-5 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(167,139,250,0.15)] transition-all"
+                className="arcade-border bg-bg-card p-6 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(212,168,83,0.15)] transition-all"
               >
                 <div className="absolute -top-3 left-4 bg-bg-card px-2">
-                  <span className="text-[8px] font-display text-primary neon-text-subtle tracking-wider">
+                  <span className="text-xs font-display text-primary neon-text-subtle tracking-wider">
                     {f.tag}
                   </span>
                 </div>
-                <h3 className="text-[9px] font-display text-text-primary mb-3 leading-relaxed mt-1">
+                <h3 className="text-sm font-display text-text-primary mb-3 leading-relaxed mt-2">
                   {f.title}
                 </h3>
-                <p className="text-xs text-text-secondary leading-relaxed">
+                <p className="text-sm text-text-secondary leading-relaxed">
                   {f.description}
                 </p>
               </div>
@@ -165,7 +176,7 @@ export default function AboutPage() {
         {/* Token Journey */}
         <section className="mb-12">
           <div className="text-center mb-8">
-            <h2 className="text-xs font-display text-text-primary mb-2 leading-relaxed">
+            <h2 className="text-lg md:text-xl font-display text-text-primary mb-2 leading-relaxed">
               TOKEN JOURNEY
             </h2>
             <p className="text-sm text-text-secondary font-mono">
@@ -174,29 +185,24 @@ export default function AboutPage() {
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {journeySteps.map((step, i) => (
-              <Card key={step.phase} padding="sm">
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 w-16 text-center">
-                    <span className="text-[8px] font-display text-primary neon-text-subtle">
+              <Card key={step.phase} padding="lg">
+                <div className="flex items-start gap-6">
+                  <div className="shrink-0 w-24 text-center">
+                    <span className="text-xs md:text-sm font-display text-primary neon-text-subtle">
                       {step.phase}
                     </span>
                   </div>
                   <div className="w-px bg-border self-stretch" />
-                  <div className="flex-1 py-0.5">
-                    <h3 className="text-[10px] font-display text-text-primary mb-1">
+                  <div className="flex-1 py-1">
+                    <h3 className="text-sm md:text-base font-display text-text-primary mb-2">
                       {step.label}
                     </h3>
-                    <p className="text-xs text-text-secondary font-mono leading-relaxed">
+                    <p className="text-sm text-text-secondary font-mono leading-relaxed">
                       {step.detail}
                     </p>
                   </div>
-                  {i < journeySteps.length - 1 && (
-                    <span className="text-[10px] font-display text-text-muted self-center">
-                      &rarr;
-                    </span>
-                  )}
                 </div>
               </Card>
             ))}
@@ -206,8 +212,8 @@ export default function AboutPage() {
         {/* VS pump.fun */}
         <section className="mb-12">
           <div className="text-center mb-8">
-            <h2 className="text-xs font-display text-text-primary mb-2 leading-relaxed">
-              FYRST VS PUMP.FUN
+            <h2 className="text-lg md:text-xl font-display text-text-primary mb-2 leading-relaxed">
+              HEDG VS PUMP.FUN
             </h2>
             <p className="text-sm text-text-secondary font-mono">
               <span className="text-primary">&gt; </span>
@@ -216,34 +222,34 @@ export default function AboutPage() {
           </div>
 
           <div className="arcade-border bg-bg-card overflow-hidden">
-            <div className="grid grid-cols-3 gap-2 px-4 py-3 border-b-2 border-border bg-bg-elevated/40">
-              <div className="text-[8px] font-display text-text-muted">
+            <div className="grid grid-cols-3 gap-4 px-6 py-4 border-b-2 border-border bg-bg-elevated/40">
+              <div className="text-xs font-display text-text-muted">
                 FEATURE
               </div>
-              <div className="text-[8px] font-display text-text-muted text-center">
+              <div className="text-xs font-display text-text-muted text-center">
                 PUMP.FUN
               </div>
-              <div className="text-[8px] font-display text-primary text-center neon-text-subtle">
-                FYRST
+              <div className="text-xs font-display text-primary text-center neon-text-subtle">
+                HEDG
               </div>
             </div>
             {comparisons.map((row, i) => (
               <div
                 key={row.feature}
-                className={`grid grid-cols-3 gap-2 px-4 py-3 items-center ${
+                className={`grid grid-cols-3 gap-4 px-6 py-4 items-center ${
                   i < comparisons.length - 1
                     ? "border-b border-border/40"
                     : ""
                 } hover:bg-bg-elevated/20 transition-colors`}
               >
-                <div className="text-xs font-medium text-text-primary">
+                <div className="text-sm font-medium text-text-primary">
                   {row.feature}
                 </div>
-                <div className="text-xs text-text-muted text-center font-mono">
+                <div className="text-sm text-error text-center font-mono opacity-80">
                   {row.pump}
                 </div>
-                <div className="text-xs text-primary text-center font-medium font-mono neon-text-subtle">
-                  {row.fyrst}
+                <div className="text-sm text-success text-center font-medium font-mono neon-text-subtle">
+                  {row.hedg}
                 </div>
               </div>
             ))}
@@ -253,7 +259,7 @@ export default function AboutPage() {
         {/* Roadmap */}
         <section className="mb-12">
           <div className="text-center mb-8">
-            <h2 className="text-xs font-display text-text-primary mb-2 leading-relaxed">
+            <h2 className="text-lg md:text-xl font-display text-text-primary mb-2 leading-relaxed">
               ROADMAP
             </h2>
             <p className="text-sm text-text-secondary font-mono">
@@ -262,12 +268,12 @@ export default function AboutPage() {
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {roadmap.map((item) => (
-              <Card key={item.title} padding="sm">
-                <div className="flex items-center gap-4">
+              <Card key={item.title} padding="lg">
+                <div className="flex items-center gap-6">
                   <span
-                    className={`shrink-0 text-[8px] font-display px-2 py-0.5 ${
+                    className={`shrink-0 text-xs font-display px-3 py-1 ${
                       item.status === "LIVE"
                         ? "bg-success/20 text-success"
                         : item.status === "DEVNET"
@@ -278,10 +284,10 @@ export default function AboutPage() {
                     {item.status}
                   </span>
                   <div className="flex-1">
-                    <h3 className="text-[10px] font-display text-text-primary">
+                    <h3 className="text-sm font-display text-text-primary mb-1">
                       {item.title}
                     </h3>
-                    <p className="text-xs text-text-secondary font-mono mt-0.5">
+                    <p className="text-sm text-text-secondary font-mono">
                       {item.detail}
                     </p>
                   </div>
@@ -295,45 +301,62 @@ export default function AboutPage() {
         <section className="mb-12">
           <Card padding="lg">
             <div className="text-center">
-              <h2 className="text-[10px] font-display text-primary mb-4 neon-text-subtle">
-                MEET BUSTER
+              <h2 className="text-sm md:text-base font-display text-primary mb-6 neon-text-subtle">
+                MEET HEDGI
               </h2>
               <img
-                src="/images/buster-hero.png"
-                alt="Buster the Border Collie"
+                src="/images/hedgi-hero.png"
+                alt="Hedgi the Hedgehog"
                 width={200}
                 height={200}
-                className="mx-auto mb-4 rounded-lg"
+                className="mx-auto mb-6 rounded-lg"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
-              <p className="text-xs text-text-secondary font-mono leading-relaxed max-w-md mx-auto">
-                Buster is a Border Collie — the smartest herding dog breed. He
-                sniffs out rugs, herds bad actors, and protects the flock.
-                He&apos;s the FYRST mascot and the spirit of the protocol: loyal,
-                vigilant, and always working.
-              </p>
+              <div className="text-sm text-text-secondary font-mono leading-relaxed max-w-lg mx-auto space-y-4">
+                <p>
+                  Hedgi is a hedgehog — small but covered in spines that protect
+                  against predators. In the wild, hedgehogs don&apos;t chase
+                  threats or start fights. When danger approaches, they curl
+                  into a tight defensive ball, turning their own body into an
+                  impenetrable fortress. The predator walks away empty-handed.
+                </p>
+                <p>
+                  That&apos;s exactly how the HEDG protocol works. When a token
+                  fails and a deployer tries to walk away, the escrow system
+                  curls around the collateral and redirects it back to the
+                  buyers who got hurt. Hedgi isn&apos;t aggressive — just
+                  prepared. Always watching, always guarding.
+                </p>
+                <p>
+                  You&apos;ll spot Hedgi wandering the forest floor of our
+                  landing page, nose twitching, spines raised, keeping a quiet
+                  eye on every launch. He&apos;s the spirit of the protocol:
+                  cute on the outside, ruthlessly defensive when it matters.
+                </p>
+              </div>
             </div>
           </Card>
         </section>
 
         {/* CTA */}
         <section className="text-center">
-          <div className="arcade-border bg-bg-card p-8">
-            <h2 className="text-[10px] font-display text-text-primary mb-3">
+          <div className="arcade-border bg-bg-card p-10">
+            <h2 className="text-lg font-display text-text-primary mb-4">
               READY TO PLAY?
             </h2>
-            <p className="text-xs text-text-secondary font-mono mb-6">
+            <p className="text-sm text-text-secondary font-mono mb-8">
               <span className="text-primary">&gt; </span>
               Browse live launches or create your own.
             </p>
-            <div className="flex gap-3 justify-center flex-wrap">
+            <div className="flex gap-4 justify-center flex-wrap">
               <Link href="/floor">
-                <Button variant="primary" size="md">
-                  FLOOR
+                <Button variant="primary" size="lg">
+                  [ FLOOR ]
                 </Button>
               </Link>
               <Link href="/launch">
-                <Button variant="outline" size="md">
-                  LAUNCH TOKEN
+                <Button variant="outline" size="lg">
+                  [ LAUNCH TOKEN ]
                 </Button>
               </Link>
             </div>

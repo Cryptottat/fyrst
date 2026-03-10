@@ -114,12 +114,12 @@ export default function BondingCurveChart({
         },
         crosshair: {
           vertLine: {
-            color: "rgba(167, 139, 250, 0.4)",
-            labelBackgroundColor: "#A78BFA",
+            color: "rgba(212, 168, 83, 0.4)",
+            labelBackgroundColor: "#D4A853",
           },
           horzLine: {
-            color: "rgba(167, 139, 250, 0.4)",
-            labelBackgroundColor: "#A78BFA",
+            color: "rgba(212, 168, 83, 0.4)",
+            labelBackgroundColor: "#D4A853",
           },
         },
         rightPriceScale: { borderColor: "#2A2A30" },

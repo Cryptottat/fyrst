@@ -30,7 +30,19 @@ function formatRemaining(deadlineStr: string | null, now: number): string {
   return `${mins}m ${String(secs).padStart(2, "0")}s`;
 }
 
-function TokenCard({ token, index, flash, now }: { token: ApiToken; index: number; flash: boolean; now: number }) {
+function CountdownTimer({ deadlineTimestamp }: { deadlineTimestamp: string | null }) {
+  const [now, setNow] = useState(Date.now());
+  
+  useEffect(() => {
+    if (!deadlineTimestamp) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [deadlineTimestamp]);
+
+  return <span className="text-text-secondary font-display">{formatRemaining(deadlineTimestamp, now)}</span>;
+}
+
+function TokenCard({ token, index, flash }: { token: ApiToken; index: number; flash: boolean }) {
   const score = token.deployer?.reputationScore ?? 50;
   const grade = getReputationGrade(score);
   const tier = token.collateralTier || "Bronze";
@@ -51,7 +63,7 @@ function TokenCard({ token, index, flash, now }: { token: ApiToken; index: numbe
   return (
     <Link href={`/token/${token.mint}`}>
       <div
-        className={`arcade-border bg-bg-card p-4 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(167,139,250,0.2)] transition-all h-full ${
+        className={`arcade-border bg-bg-card p-4 relative group hover:border-primary hover:shadow-[0_0_20px_rgba(212,168,83,0.2)] transition-all h-full ${
           flash ? "animate-card-flash" : ""
         }`}
       >
@@ -126,7 +138,7 @@ function TokenCard({ token, index, flash, now }: { token: ApiToken; index: numbe
         <div className="flex items-center justify-between font-mono border-t border-border/40 pt-2 mt-1">
           <span className="flex items-center gap-1.5 text-xs">
             <Clock className="w-3.5 h-3.5 text-warning" />
-            <span className="text-text-secondary font-display">{formatRemaining(token.deadlineTimestamp, now)}</span>
+            <CountdownTimer deadlineTimestamp={token.deadlineTimestamp} />
           </span>
           <span className="flex items-center gap-1.5 text-xs">
             <Shield className="w-3.5 h-3.5 text-primary" />
@@ -186,13 +198,9 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [sort, setTokens]);
 
-  // Tick every second for countdown timers
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
+  // We don't need a global 'now' ticking every second anymore.
+  // We only need it once for the initial sort, or we can just use Date.now() inside the memo.
+  
   const filtered = useMemo(() => {
     let list = tokens;
     if (search.trim()) {
@@ -205,18 +213,19 @@ export default function DashboardPage() {
     }
 
     // Client-side sorts for pressure / deadline / collateral
+    const currentNow = Date.now();
     if (sort === "pressure") {
       list = [...list].sort((a, b) => {
-        const remA = Math.max((new Date(a.deadlineTimestamp || 0).getTime() - now) / 1000, 1);
-        const remB = Math.max((new Date(b.deadlineTimestamp || 0).getTime() - now) / 1000, 1);
+        const remA = Math.max((new Date(a.deadlineTimestamp || 0).getTime() - currentNow) / 1000, 1);
+        const remB = Math.max((new Date(b.deadlineTimestamp || 0).getTime() - currentNow) / 1000, 1);
         const pA = a.graduated ? -1 : (a.collateralAmount / remA) * 100;
         const pB = b.graduated ? -1 : (b.collateralAmount / remB) * 100;
         return pB - pA;
       });
     } else if (sort === "deadline") {
       list = [...list].sort((a, b) => {
-        const remA = a.deadlineTimestamp ? new Date(a.deadlineTimestamp).getTime() - now : Infinity;
-        const remB = b.deadlineTimestamp ? new Date(b.deadlineTimestamp).getTime() - now : Infinity;
+        const remA = a.deadlineTimestamp ? new Date(a.deadlineTimestamp).getTime() - currentNow : Infinity;
+        const remB = b.deadlineTimestamp ? new Date(b.deadlineTimestamp).getTime() - currentNow : Infinity;
         return remA - remB; // most urgent first
       });
     } else if (sort === "collateral") {
@@ -228,7 +237,7 @@ export default function DashboardPage() {
     }
 
     return list;
-  }, [search, tokens, sort, now]);
+  }, [search, tokens, sort]);
 
   // Flash effect when any token has a trade (from socket price:update)
   const lastTradedMint = useAppStore((s) => s.lastTradedMint);
@@ -282,10 +291,10 @@ export default function DashboardPage() {
               <button
                 key={option.key}
                 onClick={() => setSort(option.key)}
-                className={`px-3 py-2.5 text-[8px] font-display border-2 transition-colors cursor-pointer ${
+                className={`px-4 py-2 text-[10px] font-display border-2 transition-colors cursor-pointer ${
                   sort === option.key
                     ? "border-primary text-primary bg-primary/10 neon-text-subtle"
-                    : "border-border text-text-muted hover:border-border-hover"
+                    : "border-border text-text-muted hover:border-border-hover hover:text-text-secondary"
                 }`}
               >
                 {option.label}
@@ -312,7 +321,6 @@ export default function DashboardPage() {
                 token={token}
                 index={i}
                 flash={flashMint === token.mint}
-                now={now}
               />
             ))}
           </div>

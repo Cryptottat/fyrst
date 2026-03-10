@@ -98,7 +98,7 @@ export default function LaunchPage() {
           publicKey,
           lamports,
           name.trim(),
-          symbol.trim().toUpperCase(),
+          symbol.trim(),
           onChainUri,
           buyLamports,
           duration,
@@ -110,7 +110,7 @@ export default function LaunchPage() {
           publicKey,
           lamports,
           name.trim(),
-          symbol.trim().toUpperCase(),
+          symbol.trim(),
           onChainUri,
           duration,
         );
@@ -131,7 +131,7 @@ export default function LaunchPage() {
       await createLaunch({
         mint: mintAddress,
         name: name.trim(),
-        symbol: symbol.trim().toUpperCase(),
+        symbol: symbol.trim(),
         description: fullDescription,
         imageUrl: imageUrl.trim(),
         deployerAddress: publicKey.toBase58(),
@@ -179,7 +179,7 @@ export default function LaunchPage() {
         <Card padding="lg">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="name" className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label htmlFor="name" className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 TOKEN NAME
               </label>
               <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)}
@@ -187,15 +187,15 @@ export default function LaunchPage() {
             </div>
 
             <div>
-              <label htmlFor="symbol" className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label htmlFor="symbol" className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 SYMBOL
               </label>
-              <input id="symbol" type="text" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              <input id="symbol" type="text" value={symbol} onChange={(e) => setSymbol(e.target.value)}
                 placeholder="e.g. GUARD" maxLength={10} disabled={isProcessing} className={`${inputClass} font-mono`} />
             </div>
 
             <div>
-              <label htmlFor="description" className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label htmlFor="description" className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 DESCRIPTION
               </label>
               <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)}
@@ -204,9 +204,13 @@ export default function LaunchPage() {
             </div>
 
             <div>
-              <label className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 TOKEN IMAGE
               </label>
+              <p className="text-[10px] text-text-muted mb-3 font-mono">
+                <span className="text-primary">&gt; </span>
+                Image is stored off-chain to save deployment costs.
+              </p>
               <div className="flex gap-3 items-start">
                 <label className="flex-1 cursor-pointer">
                   <div className={`${inputClass} text-center py-4 hover:border-primary transition-colors ${imageUrl ? "border-success" : ""}`}>
@@ -265,7 +269,7 @@ export default function LaunchPage() {
             </div>
 
             <div>
-              <label className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 LINKS (OPTIONAL)
               </label>
               <div className="space-y-2">
@@ -298,16 +302,18 @@ export default function LaunchPage() {
             </div>
 
             <div>
-              <label htmlFor="collateral" className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label htmlFor="collateral" className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 COINS TO INSERT (SOL)
               </label>
               <div className="flex items-center gap-4">
                 <input id="collateral" type="number" min={MIN_COLLATERAL} step="any"
                   value={collateralInput} onChange={(e) => setCollateralInput(e.target.value)}
-                  onBlur={() => { if (collateral < MIN_COLLATERAL) setCollateralInput(String(MIN_COLLATERAL)); }}
-                  disabled={isProcessing} className={`flex-1 ${inputClass}`} />
+                  disabled={isProcessing} className={`flex-1 ${inputClass} ${collateral < MIN_COLLATERAL ? "border-error focus:border-error" : ""}`} />
                 <Badge label={currentTier} variant="collateral" />
               </div>
+              {collateral < MIN_COLLATERAL && (
+                <p className="text-[10px] text-error mt-1 font-mono">Minimum collateral is {MIN_COLLATERAL} SOL.</p>
+              )}
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {COLLATERAL_TIERS.map((tier) => (
@@ -325,7 +331,7 @@ export default function LaunchPage() {
             </div>
 
             <div>
-              <label className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 DEADLINE
               </label>
               <div className="flex flex-wrap gap-2">
@@ -348,7 +354,7 @@ export default function LaunchPage() {
             </div>
 
             <div>
-              <label htmlFor="initialBuy" className="block text-[8px] font-display text-text-secondary mb-2 tracking-wider">
+              <label htmlFor="initialBuy" className="block text-[10px] font-display text-text-secondary mb-2 tracking-wider">
                 INITIAL BUY (SOL) — OPTIONAL
               </label>
               <input

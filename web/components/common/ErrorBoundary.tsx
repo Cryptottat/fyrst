@@ -23,7 +23,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("[FYRST] Component error:", error, info.componentStack);
+    console.error("[HEDG] Component error:", error, info.componentStack);
   }
 
   render() {
