@@ -4,9 +4,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function getUpstream(): string {
-  const fromEnv = process.env.HELIUS_RPC_URL;
-  if (fromEnv) return fromEnv;
+  if (process.env.HELIUS_RPC_URL) return process.env.HELIUS_RPC_URL;
   const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
+  const fromMode = isDevnet
+    ? process.env.HELIUS_DEVNET_URL
+    : process.env.HELIUS_MAINNET_URL;
+  if (fromMode) return fromMode;
   return isDevnet
     ? "https://api.devnet.solana.com"
     : "https://api.mainnet-beta.solana.com";

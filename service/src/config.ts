@@ -2,20 +2,31 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // ---------------------------------------------------------------------------
-// Single switch: DEVNET=true (default) or DEVNET=false for mainnet.
+// Network switch: DEVNET=true (default) or DEVNET=false for mainnet.
 // RPC layout (Helius $999/mo plan):
-//   HELIUS_RPC_URL         — main RPC (general read + DAS + sendTransaction)
-//   HELIUS_GATEKEEPER_URL  — beta gatekeeper (high-throughput / priority send)
-//   LASERSTREAM_URL + LASERSTREAM_API_KEY — ultra-low-latency stream
-//   HELIUS_WS_URL          — Enhanced WebSocket (real-time subs)
-// If only HELIUS_API_KEY is set, URLs are derived for compatibility.
+//   HELIUS_DEVNET_URL       — devnet HTTP RPC (read + DAS + sendTransaction)
+//   HELIUS_MAINNET_URL      — mainnet HTTP RPC
+//   HELIUS_WS_DEVNET_URL    — devnet WebSocket
+//   HELIUS_WS_MAINNET_URL   — mainnet WebSocket
+//   HELIUS_GATEKEEPER_URL   — mainnet beta gatekeeper (high-throughput send)
+//   LASERSTREAM_URL +
+//   LASERSTREAM_API_KEY     — mainnet laserstream (ultra-low latency)
+//   HELIUS_RPC_URL          — explicit override (wins over both mode URLs)
+//   HELIUS_API_KEY          — legacy fallback to derive URLs if no mode URL set
+// Server-side only — never expose to client.
 // ---------------------------------------------------------------------------
 
 const isDevnet = process.env.DEVNET !== "false";
 const heliusApiKey = process.env.HELIUS_API_KEY || "";
 
+function pickByMode(mainnet: string | undefined, devnet: string | undefined): string | undefined {
+  return isDevnet ? devnet : mainnet;
+}
+
 function deriveHttp(): string {
   if (process.env.HELIUS_RPC_URL) return process.env.HELIUS_RPC_URL;
+  const fromMode = pickByMode(process.env.HELIUS_MAINNET_URL, process.env.HELIUS_DEVNET_URL);
+  if (fromMode) return fromMode;
   if (heliusApiKey) {
     return `https://${isDevnet ? "devnet" : "mainnet"}.helius-rpc.com/?api-key=${heliusApiKey}`;
   }
@@ -26,15 +37,18 @@ function deriveHttp(): string {
 
 function deriveWs(): string {
   if (process.env.HELIUS_WS_URL) return process.env.HELIUS_WS_URL;
-  if (heliusApiKey && !isDevnet) {
-    return `wss://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+  const fromMode = pickByMode(process.env.HELIUS_WS_MAINNET_URL, process.env.HELIUS_WS_DEVNET_URL);
+  if (fromMode) return fromMode;
+  if (heliusApiKey) {
+    return `wss://${isDevnet ? "devnet" : "mainnet"}.helius-rpc.com/?api-key=${heliusApiKey}`;
   }
   return deriveHttp().replace(/^http/, "ws");
 }
 
 function deriveGatekeeper(): string {
+  // Gatekeeper is mainnet-only; on devnet, fall back to the main HTTP URL.
   if (process.env.HELIUS_GATEKEEPER_URL) return process.env.HELIUS_GATEKEEPER_URL;
-  if (heliusApiKey && !isDevnet) {
+  if (!isDevnet && heliusApiKey) {
     return `https://beta.helius-rpc.com/?api-key=${heliusApiKey}`;
   }
   return deriveHttp();
@@ -48,10 +62,10 @@ export const config = {
     process.env.LOG_LEVEL ||
     (process.env.NODE_ENV === "production" ? "info" : "debug"),
 
-  // Solana network switch
+  // Network mode
   isDevnet,
 
-  // Helius RPC endpoints (server-side only — never expose to client)
+  // Helius RPC endpoints (server-side only)
   solanaRpc: deriveHttp(),
   heliusGatekeeperUrl: deriveGatekeeper(),
   heliusWsUrl: deriveWs(),

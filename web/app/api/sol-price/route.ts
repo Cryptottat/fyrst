@@ -62,7 +62,10 @@ async function fromKraken(): Promise<number | null> {
 }
 
 async function fromHeliusDas(): Promise<number | null> {
-  const url = process.env.HELIUS_RPC_URL;
+  const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
+  const url =
+    process.env.HELIUS_RPC_URL ||
+    (isDevnet ? process.env.HELIUS_DEVNET_URL : process.env.HELIUS_MAINNET_URL);
   if (!url) return null;
   try {
     const r = await fetch(url, {
