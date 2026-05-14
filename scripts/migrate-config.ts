@@ -10,7 +10,8 @@ import * as path from "path";
 const PROGRAM_ID = new PublicKey("CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP");
 const PROTOCOL_SEED = Buffer.from("protocol");
 
-const RPC_URL = process.env.HELIUS_RPC_URL || "https://devnet.helius-rpc.com/?api-key=d5b2c18e-f19a-48b3-ae07-b1bb5436e6d6";
+const RPC_URL = process.env.HELIUS_RPC_URL;
+if (!RPC_URL) throw new Error("HELIUS_RPC_URL env var is required");
 
 async function main() {
   const walletPath = path.resolve(process.env.HOME || "~", ".config/solana/id.json");

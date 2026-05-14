@@ -106,60 +106,18 @@ export function formatPrice(price: number): string {
 }
 
 /**
- * Fetch SOL/USD price with multi-tier fallback.
- * CoinGecko → Binance → OKX → Kraken → Helius DAS.
- * Returns the price or null if all fail.
+ * Fetch SOL/USD price via the same-origin /api/sol-price route handler.
+ * Server-side does the multi-source fallback (CoinGecko → Binance → OKX → Kraken → Helius DAS).
  */
 export async function fetchSolPrice(): Promise<number | null> {
-  // 1. CoinGecko
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+    const r = await fetch("/api/sol-price", { cache: "no-store" });
+    if (!r.ok) return null;
     const json = await r.json();
-    if (json?.solana?.usd) return json.solana.usd;
-  } catch { /* next */ }
-
-  // 2. Binance
-  try {
-    const r = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT");
-    const json = await r.json();
-    if (json?.price) return parseFloat(json.price);
-  } catch { /* next */ }
-
-  // 3. OKX
-  try {
-    const r = await fetch("https://www.okx.com/api/v5/market/ticker?instId=SOL-USDT");
-    const json = await r.json();
-    const p = json?.data?.[0]?.last;
-    if (p) return parseFloat(p);
-  } catch { /* next */ }
-
-  // 4. Kraken
-  try {
-    const r = await fetch("https://api.kraken.com/0/public/Ticker?pair=SOLUSD");
-    const json = await r.json();
-    const p = json?.result?.SOLUSD?.c?.[0];
-    if (p) return parseFloat(p);
-  } catch { /* next */ }
-
-  // 5. Helius DAS
-  try {
-    const key = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-    if (key) {
-      const r = await fetch(`https://mainnet.helius-rpc.com/?api-key=${key}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1, method: "getAsset",
-          params: { id: "So11111111111111111111111111111111111111112" },
-        }),
-      });
-      const json = await r.json();
-      const p = json?.result?.token_info?.price_info?.price_per_token;
-      if (p) return p;
-    }
-  } catch { /* silent */ }
-
-  return null;
+    return typeof json?.price === "number" ? json.price : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

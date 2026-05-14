@@ -34,8 +34,8 @@ import * as path from "path";
 // ─── Config ──────────────────────────────────────────────────────
 const PROGRAM_ID = new PublicKey("CcyByKGzRDK17icyNGAgdUN4q7WzbL1BPi4BNzqytyMP");
 const METAPLEX_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-// devnet 전용 — 메인넷 키는 환경변수로만 사용할 것
-const RPC_URL = process.env.HELIUS_RPC_URL || "https://devnet.helius-rpc.com/?api-key=d5b2c18e-f19a-48b3-ae07-b1bb5436e6d6";
+const RPC_URL = process.env.HELIUS_RPC_URL;
+if (!RPC_URL) throw new Error("HELIUS_RPC_URL env var is required");
 
 const ESCROW_SEED = Buffer.from("escrow");
 const CURVE_SEED = Buffer.from("curve");

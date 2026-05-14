@@ -31,9 +31,10 @@ export function startOnchainListener(): void {
     return;
   }
 
-  // Convert HTTP URL to WebSocket for subscription
-  const wsUrl = rpcUrl.replace("https://", "wss://").replace("http://", "ws://");
-  rpcConnection = new Connection(rpcUrl, { wsEndpoint: wsUrl, commitment: "confirmed" });
+  rpcConnection = new Connection(rpcUrl, {
+    wsEndpoint: config.heliusWsUrl,
+    commitment: "confirmed",
+  });
 
   logger.info(`Starting on-chain listener for program ${config.programId}`);
 

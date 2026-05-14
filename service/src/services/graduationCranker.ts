@@ -65,11 +65,8 @@ export function initCranker(): boolean {
     return false;
   }
 
-  const wsUrl = config.solanaRpc
-    .replace("https://", "wss://")
-    .replace("http://", "ws://");
   connection = new Connection(config.solanaRpc, {
-    wsEndpoint: wsUrl,
+    wsEndpoint: config.heliusWsUrl,
     commitment: "confirmed",
   });
 

@@ -15,17 +15,21 @@ import {
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-// ---------------------------------------------------------------------------
-// Single switch: NEXT_PUBLIC_DEVNET=true (default) or false for mainnet
-// Helius key from NEXT_PUBLIC_HELIUS_API_KEY — same key works for both networks
-// ---------------------------------------------------------------------------
-function getDefaultEndpoint(): string {
-  const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
-  const heliusKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-  if (heliusKey) {
-    return `https://${isDevnet ? "devnet" : "mainnet"}.helius-rpc.com/?api-key=${heliusKey}`;
+const RPC_PROXY_PATH = "/api/rpc";
+
+function getEndpoint(): string {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${RPC_PROXY_PATH}`;
   }
-  return clusterApiUrl(isDevnet ? "devnet" : "mainnet-beta");
+  const site = process.env.NEXT_PUBLIC_SITE_URL;
+  if (site) return `${site.replace(/\/$/, "")}${RPC_PROXY_PATH}`;
+  return RPC_PROXY_PATH;
+}
+
+function getWsEndpoint(): string {
+  const isDevnet = process.env.NEXT_PUBLIC_DEVNET !== "false";
+  const cluster = isDevnet ? "devnet" : "mainnet-beta";
+  return clusterApiUrl(cluster).replace(/^http/, "ws");
 }
 
 interface Props {
@@ -34,10 +38,8 @@ interface Props {
 }
 
 export default function WalletProvider({ children, rpcEndpoint }: Props) {
-  const endpoint = useMemo(
-    () => rpcEndpoint || getDefaultEndpoint(),
-    [rpcEndpoint],
-  );
+  const endpoint = useMemo(() => rpcEndpoint || getEndpoint(), [rpcEndpoint]);
+  const wsEndpoint = useMemo(() => getWsEndpoint(), []);
 
   const wallets = useMemo(
     () => [
@@ -49,7 +51,10 @@ export default function WalletProvider({ children, rpcEndpoint }: Props) {
   );
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider
+      endpoint={endpoint}
+      config={{ commitment: "confirmed", wsEndpoint }}
+    >
       <SolanaWalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </SolanaWalletProvider>
