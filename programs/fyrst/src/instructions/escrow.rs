@@ -84,9 +84,9 @@ pub fn expire_escrow(ctx: Context<ExpireEscrow>) -> Result<()> {
     let collateral = escrow.collateral_amount;
     let protocol_share = collateral / 2;
 
-    // Split protocol share: OPS_SHARE_BPS% → ops_wallet, rest → treasury
+    // Split protocol share: ESCROW_OPS_BPS% → ops_wallet, rest → treasury
     let ops_share = protocol_share
-        .checked_mul(OPS_SHARE_BPS)
+        .checked_mul(ESCROW_OPS_BPS)
         .ok_or(FyrstError::MathOverflow)?
         .checked_div(BPS_DENOMINATOR)
         .ok_or(FyrstError::MathOverflow)?;

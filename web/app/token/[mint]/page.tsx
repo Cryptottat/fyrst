@@ -504,7 +504,7 @@ export default function TokenDetailPage({
         rows: [
           { label: "TOKEN", value: `$${token?.symbol}` },
           { label: "AMOUNT", value: `${solAmount} SOL` },
-          { label: "FEE (1%)", value: `${(solAmount * 0.01).toFixed(4)} SOL` },
+          { label: "FEE (2%)", value: `${(solAmount * 0.02).toFixed(4)} SOL` },
           { label: "SLIPPAGE", value: `${(slippageBps / 100).toFixed(1)}%` },
         ],
         onConfirm: () => { setConfirmModal(null); executeBuy(solAmount); },
@@ -559,7 +559,7 @@ export default function TokenDetailPage({
           { label: "TOKEN", value: `$${token?.symbol}` },
           { label: "AMOUNT", value: `${wholeTokens.toLocaleString()} tokens` },
           { label: "EST. VALUE", value: `~${estimatedSolValue.toFixed(4)} SOL` },
-          { label: "FEE (1%)", value: `${(estimatedSolValue * 0.01).toFixed(4)} SOL` },
+          { label: "FEE (2%)", value: `${(estimatedSolValue * 0.02).toFixed(4)} SOL` },
           { label: "SLIPPAGE", value: `${(slippageBps / 100).toFixed(1)}%` },
         ],
         onConfirm: () => { setConfirmModal(null); executeSell(wholeTokens); },
@@ -1485,7 +1485,7 @@ export default function TokenDetailPage({
             {
               icon: Percent,
               title: "FEES",
-              desc: "1% fee on every buy & sell. A portion is distributed back to the deployer.",
+              desc: "2% fee on every buy & sell. 25% to deployer, 50% to ops, 25% to $HEDG buyback.",
               color: "text-primary",
             },
             {

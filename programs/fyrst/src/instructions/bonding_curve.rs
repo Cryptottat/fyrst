@@ -256,24 +256,30 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, sol_amount: u64, min_tokens_out: u64)
         tokens,
     )?;
 
-    // Split trade fee: 50% deployer, 50% protocol (of which OPS_SHARE_BPS% → ops, rest → treasury)
-    let deployer_share = trade_fee / 2;
-    let treasury_trade_share = trade_fee.checked_sub(deployer_share).ok_or(FyrstError::MathOverflow)?;
-    if treasury_trade_share > 0 {
-        let ops_share = treasury_trade_share
-            .checked_mul(OPS_SHARE_BPS)
-            .ok_or(FyrstError::MathOverflow)?
-            .checked_div(BPS_DENOMINATOR)
-            .ok_or(FyrstError::MathOverflow)?;
-        let buyback_share = treasury_trade_share.checked_sub(ops_share).ok_or(FyrstError::MathOverflow)?;
-        if ops_share > 0 {
-            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= ops_share;
-            **ctx.accounts.ops_wallet.to_account_info().try_borrow_mut_lamports()? += ops_share;
-        }
-        if buyback_share > 0 {
-            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= buyback_share;
-            **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += buyback_share;
-        }
+    // Split trade fee: 25% deployer, 50% ops_wallet, 25% treasury
+    let deployer_share = trade_fee
+        .checked_mul(TRADE_DEPLOYER_BPS)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_div(BPS_DENOMINATOR)
+        .ok_or(FyrstError::MathOverflow)?;
+    let ops_share = trade_fee
+        .checked_mul(TRADE_OPS_BPS)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_div(BPS_DENOMINATOR)
+        .ok_or(FyrstError::MathOverflow)?;
+    let buyback_share = trade_fee
+        .checked_sub(deployer_share)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_sub(ops_share)
+        .ok_or(FyrstError::MathOverflow)?;
+
+    if ops_share > 0 {
+        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= ops_share;
+        **ctx.accounts.ops_wallet.to_account_info().try_borrow_mut_lamports()? += ops_share;
+    }
+    if buyback_share > 0 {
+        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= buyback_share;
+        **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += buyback_share;
     }
 
     let graduation_threshold = ctx.accounts.protocol_config.graduation_threshold;
@@ -400,27 +406,32 @@ pub fn sell_tokens(ctx: Context<SellTokens>, token_amount: u64, min_sol_out: u64
     **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= net_sol;
     **ctx.accounts.seller.to_account_info().try_borrow_mut_lamports()? += net_sol;
 
-    // Split trade fee: 50% deployer, 50% protocol (of which OPS_SHARE_BPS% → ops, rest → treasury)
-    let deployer_share = trade_fee_sell / 2;
-    let treasury_trade_share = trade_fee_sell.checked_sub(deployer_share).ok_or(FyrstError::MathOverflow)?;
-    let total_protocol_sell = treasury_trade_share
+    // Split trade fee: 25% deployer, 50% ops_wallet, 25% treasury (+ any protocol_fee_sell to treasury)
+    let deployer_share = trade_fee_sell
+        .checked_mul(TRADE_DEPLOYER_BPS)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_div(BPS_DENOMINATOR)
+        .ok_or(FyrstError::MathOverflow)?;
+    let ops_share = trade_fee_sell
+        .checked_mul(TRADE_OPS_BPS)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_div(BPS_DENOMINATOR)
+        .ok_or(FyrstError::MathOverflow)?;
+    let buyback_share = trade_fee_sell
+        .checked_sub(deployer_share)
+        .ok_or(FyrstError::MathOverflow)?
+        .checked_sub(ops_share)
+        .ok_or(FyrstError::MathOverflow)?
         .checked_add(protocol_fee_sell)
         .ok_or(FyrstError::MathOverflow)?;
-    if total_protocol_sell > 0 {
-        let ops_share = total_protocol_sell
-            .checked_mul(OPS_SHARE_BPS)
-            .ok_or(FyrstError::MathOverflow)?
-            .checked_div(BPS_DENOMINATOR)
-            .ok_or(FyrstError::MathOverflow)?;
-        let buyback_share = total_protocol_sell.checked_sub(ops_share).ok_or(FyrstError::MathOverflow)?;
-        if ops_share > 0 {
-            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= ops_share;
-            **ctx.accounts.ops_wallet.to_account_info().try_borrow_mut_lamports()? += ops_share;
-        }
-        if buyback_share > 0 {
-            **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= buyback_share;
-            **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += buyback_share;
-        }
+
+    if ops_share > 0 {
+        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= ops_share;
+        **ctx.accounts.ops_wallet.to_account_info().try_borrow_mut_lamports()? += ops_share;
+    }
+    if buyback_share > 0 {
+        **ctx.accounts.bonding_curve.to_account_info().try_borrow_mut_lamports()? -= buyback_share;
+        **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += buyback_share;
     }
 
     // Update curve state — total_sol_collected does NOT decrease

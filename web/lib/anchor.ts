@@ -269,8 +269,8 @@ export async function launchAndBuy(
     })
     .instruction();
 
-  // Calculate expected tokens using known initial reserves
-  const tradeFee = buyAmountLamports.mul(new BN(100)).div(new BN(10_000));
+  // Calculate expected tokens using known initial reserves (2% trade fee)
+  const tradeFee = buyAmountLamports.mul(new BN(200)).div(new BN(10_000));
   const netSol = buyAmountLamports.sub(tradeFee);
   const expectedTokens = estimateBuyTokens(
     INITIAL_VIRTUAL_TOKEN_RESERVES,
@@ -359,8 +359,8 @@ export async function buyTokens(
   const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve); // eslint-disable-line @typescript-eslint/no-explicit-any
   const ca = curveAccount as BondingCurveData;
 
-  // Calculate fees and net SOL (1% total fee)
-  const tradeFee = solAmountLamports.mul(new BN(100)).div(new BN(10_000));
+  // Calculate fees and net SOL (2% total fee)
+  const tradeFee = solAmountLamports.mul(new BN(200)).div(new BN(10_000));
   const netSol = solAmountLamports.sub(tradeFee);
 
   // Estimate tokens using constant product AMM
@@ -417,7 +417,7 @@ export async function sellTokens(
   const curveAccount = await (program.account as any).bondingCurve.fetch(bondingCurve); // eslint-disable-line @typescript-eslint/no-explicit-any
   const ca = curveAccount as BondingCurveData;
 
-  // Estimate SOL received using constant product AMM (1% total fee)
+  // Estimate SOL received using constant product AMM (2% total fee)
   let expectedGross = estimateSellSol(ca.virtualTokenReserves, ca.virtualSolReserves, tokenAmount);
 
   // Cap gross at reserve balance (matches on-chain cap)
@@ -425,7 +425,7 @@ export async function sellTokens(
     expectedGross = ca.reserveBalance;
   }
 
-  const tradeFee = expectedGross.muln(100).divn(10_000); // 1%
+  const tradeFee = expectedGross.muln(200).divn(10_000); // 2%
   const expectedNet = expectedGross.sub(tradeFee);
 
   const minSolOut = expectedNet.muln(10_000 - slippageBps).divn(10_000);

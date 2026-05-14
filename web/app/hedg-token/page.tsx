@@ -14,21 +14,21 @@ const tokenomics = [
 const feeBreakdown = [
   {
     tag: "01",
-    title: "TRADING FEE (1%)",
+    title: "TRADING FEE (2%)",
     description:
-      "Every buy and sell on the HEDG bonding curve incurs a 1% fee. This funds both deployers and the protocol treasury.",
+      "Every buy and sell on the HEDG bonding curve incurs a 2% fee. This funds deployers, protocol operations, and the $HEDG treasury.",
   },
   {
     tag: "02",
-    title: "DEPLOYER SHARE (50%)",
+    title: "DEPLOYER SHARE (25%)",
     description:
-      "Half of the 1% fee goes directly to the token deployer. Claimable anytime — rewarding builders who launch on HEDG.",
+      "Quarter of the fee (0.5% of trade volume) flows to the token deployer. Claimable with progressive unlock — rewarding builders who launch on HEDG.",
   },
   {
     tag: "03",
-    title: "TREASURY SHARE (50%)",
+    title: "OPS + TREASURY (75%)",
     description:
-      "The other half of the fee flows to the HEDG treasury. 30% of treasury inflow is used to buy back $HEDG on Jupiter.",
+      "50% of the fee (1.0% of volume) funds protocol operations. 25% (0.5% of volume) flows to the treasury for $HEDG buyback+burn.",
   },
 ];
 
@@ -59,7 +59,7 @@ const buybackSteps = [
 ];
 
 const governanceItems = [
-  { param: "Fee Rate", current: "1%", note: "Trading fee percentage" },
+  { param: "Fee Rate", current: "2%", note: "Trading fee percentage" },
   {
     param: "Graduation Threshold",
     current: "85 SOL",
@@ -164,12 +164,17 @@ export default function HedgTokenPage() {
             </h2>
             <div className="font-mono text-sm text-text-secondary leading-loose">
               <p className="text-text-primary mb-2">
-                Trade 1 SOL (1% fee = 0.01 SOL)
+                Trade 1 SOL (2% fee = 0.02 SOL)
               </p>
               <p className="ml-4">
                 <span className="text-accent">├──</span>{" "}
                 <span className="text-text-primary">0.5%</span> → Deployer{" "}
                 <span className="text-text-muted">(claimable)</span>
+              </p>
+              <p className="ml-4">
+                <span className="text-accent">├──</span>{" "}
+                <span className="text-text-primary">1.0%</span> → Ops Wallet{" "}
+                <span className="text-text-muted">(service revenue)</span>
               </p>
               <p className="ml-4">
                 <span className="text-accent">└──</span>{" "}
@@ -298,12 +303,16 @@ export default function HedgTokenPage() {
                 <div className="space-y-2 text-center">
                   <p className="text-success">Traders buy near deadline for escrow refund arbitrage</p>
                   <p className="text-text-muted">&darr;</p>
-                  <p>Increased trading volume + 1% trade fees</p>
+                  <p>Increased trading volume + 2% trade fees</p>
                   <p className="text-text-muted">&darr;</p>
-                  <div className="flex justify-center gap-12 mt-4">
+                  <div className="flex justify-center gap-8 mt-4">
                     <div className="text-center">
                       <p className="text-accent">0.5% Deployer</p>
                       <p className="text-text-muted text-xs">builder reward</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-accent">1.0% Ops</p>
+                      <p className="text-text-muted text-xs">service revenue</p>
                     </div>
                     <div className="text-center">
                       <p className="text-primary neon-text-subtle">0.5% Treasury</p>
@@ -336,9 +345,10 @@ export default function HedgTokenPage() {
               </p>
               <p>
                 <span className="text-text-primary">Fee generation:</span>{" "}
-                Every trade from these arbitrageurs generates 1% fees — 0.5% to
-                deployers and 0.5% to the treasury. The treasury&apos;s share
-                triggers automatic $HEDG buyback and burn on Jupiter.
+                Every trade from these arbitrageurs generates 2% fees — 0.5% to
+                deployers, 1.0% to protocol operations, and 0.5% to the treasury.
+                The treasury&apos;s share triggers automatic $HEDG buyback and
+                burn on Jupiter.
               </p>
               <p>
                 <span className="text-text-primary">Deflationary pressure:</span>{" "}

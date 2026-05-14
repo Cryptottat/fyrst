@@ -10,17 +10,25 @@ pub const MAX_DURATION: i64 = 604_800;
 /// Protocol fee in basis points (0% — folded into trade fee split)
 pub const PROTOCOL_FEE_BPS: u64 = 0;
 
-/// Trade fee in basis points (1% = 100 bps, split 50/50: deployer + treasury)
-pub const TRADE_FEE_BPS: u64 = 100;
+/// Trade fee in basis points (2% = 200 bps).
+/// Distribution (of the trade fee):
+///   TRADE_DEPLOYER_BPS = 25% → deployer (claim_fees with progressive unlock)
+///   TRADE_OPS_BPS      = 50% → ops_wallet (service revenue)
+///   remainder          = 25% → treasury ($HEDG buyback+burn)
+pub const TRADE_FEE_BPS: u64 = 200;
 
-/// Deployer fee share in basis points (50 = 0.5% of trade volume)
-pub const DEPLOYER_FEE_BPS: u64 = 50;
+/// Of every trade fee, share routed to the deployer (25%)
+pub const TRADE_DEPLOYER_BPS: u64 = 2_500;
+
+/// Of every trade fee, share routed to ops_wallet (50%)
+pub const TRADE_OPS_BPS: u64 = 5_000;
 
 /// Deploy fee in lamports (0.02 SOL)
 pub const DEPLOY_FEE: u64 = 20_000_000;
 
-/// Operations wallet share of treasury fees in basis points (40% = 4000 bps)
-pub const OPS_SHARE_BPS: u64 = 4000;
+/// Of expired-escrow protocol share, portion routed to ops_wallet (50%).
+/// Treasury receives the remaining 50%.
+pub const ESCROW_OPS_BPS: u64 = 5_000;
 
 /// Escrow PDA seed
 pub const ESCROW_SEED: &[u8] = b"escrow";

@@ -82,8 +82,15 @@ export const DEADLINE_PRESETS = [
   { label: "7 DAYS", seconds: 604_800 },
 ] as const;
 
-/** Protocol fee as a decimal (0% — folded into 1% trade fee split) */
+/** Protocol fee as a decimal (0% — folded into trade fee split) */
 export const PROTOCOL_FEE = 0;
 
-/** Trade fee as a decimal (1%) */
-export const TRADE_FEE = 0.01;
+/** Trade fee as a decimal (2%). Distribution:
+ *   25% → deployer (0.5% of volume, progressive unlock)
+ *   50% → ops_wallet (1.0% of volume, service revenue)
+ *   25% → treasury (0.5% of volume, $HEDG buyback+burn)
+ */
+export const TRADE_FEE = 0.02;
+export const TRADE_DEPLOYER_PCT = 0.25;
+export const TRADE_OPS_PCT = 0.5;
+export const TRADE_TREASURY_PCT = 0.25;
