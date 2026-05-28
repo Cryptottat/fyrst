@@ -9,7 +9,7 @@ import { executeWithRetry } from "./graduationCranker";
 // ---------------------------------------------------------------------------
 // On-chain Event Listener (Section 5 — On-chain Data Sync)
 //
-// Listens to FYRST program logs via WebSocket (connection.onLogs) and
+// Listens to HEDG program logs via WebSocket (connection.onLogs) and
 // parses buy/sell events to update the DB. This replaces the client-
 // authoritative POST /api/trade approach.
 // ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ let rpcConnection: Connection | null = null;
 /**
  * Start listening to on-chain program events.
  * Uses Solana RPC WebSocket `onLogs` to watch for all transactions
- * involving the FYRST program.
+ * involving the HEDG program.
  */
 export function startOnchainListener(): void {
   const rpcUrl = config.solanaRpc;
@@ -65,7 +65,7 @@ export async function stopOnchainListener(): Promise<void> {
 }
 
 /**
- * Parse FYRST program logs and extract trade events.
+ * Parse HEDG program logs and extract trade events.
  *
  * Actual Rust msg!() log formats:
  *   "Buy: buyer=ADDR, sol=AMOUNT, tokens=AMOUNT, new_supply=AMOUNT"

@@ -98,7 +98,7 @@ async function start(): Promise<void> {
   // Buyback scheduler — only activates when BUYBACK_TOKEN_MINT is set
   startBuyback();
 
-  // On-chain event listener — watches FYRST program for trades/graduations
+  // On-chain event listener — watches HEDG program for trades/graduations
   startOnchainListener();
 
   // Graduation cranker — auto-migrates graduated tokens to Raydium
@@ -110,7 +110,7 @@ async function start(): Promise<void> {
   }
 
   httpServer.listen(config.port, () => {
-    logger.info(`FYRST API server running on port ${config.port}`);
+    logger.info(`HEDG API server running on port ${config.port}`);
   });
 }
 

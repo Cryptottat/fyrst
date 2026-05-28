@@ -171,7 +171,7 @@ async function executeBuyback(): Promise<void> {
     const buybackLamports = Math.floor(buybackSol * LAMPORTS_PER_SOL);
 
     logger.info(
-      `Buyback: executing ${buybackSol.toFixed(4)} SOL (${buybackPct}% of ${newFeeSol.toFixed(4)} SOL new fees) → $FYRST`
+      `Buyback: executing ${buybackSol.toFixed(4)} SOL (${buybackPct}% of ${newFeeSol.toFixed(4)} SOL new fees) → $HEDG`
     );
 
     const txSig = await jupiterSwap(keypair, buybackTokenMint, buybackLamports);
@@ -183,14 +183,14 @@ async function executeBuyback(): Promise<void> {
       totalBuybackCount++;
 
       logger.info(
-        `Buyback SUCCESS: ${buybackSol.toFixed(4)} SOL → $FYRST | TX: ${txSig} | Total: ${totalBuybackSol.toFixed(4)} SOL (${totalBuybackCount} swaps)`
+        `Buyback SUCCESS: ${buybackSol.toFixed(4)} SOL → $HEDG | TX: ${txSig} | Total: ${totalBuybackSol.toFixed(4)} SOL (${totalBuybackCount} swaps)`
       );
 
       // Notify via Telegram
       sendAlert(
         "BUYBACK EXECUTED",
         `Amount: ${buybackSol.toFixed(4)} SOL\n` +
-        `Token: $FYRST\n` +
+        `Token: $HEDG\n` +
         `TX: https://solscan.io/tx/${txSig}\n` +
         `Total buyback: ${totalBuybackSol.toFixed(4)} SOL (${totalBuybackCount} swaps)`,
       ).catch(() => {});

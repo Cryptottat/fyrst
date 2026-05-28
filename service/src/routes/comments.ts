@@ -70,7 +70,7 @@ commentsRouter.post(
       }
 
       // Verify wallet signature
-      const message = `FYRST comment on ${tokenMint}: ${content}`;
+      const message = `HEDG comment on ${tokenMint}: ${content}`;
       const messageBytes = new TextEncoder().encode(message);
 
       let verified = false;
