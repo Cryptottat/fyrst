@@ -37,6 +37,7 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://hedg.lol"),
   title: "HEDG — Launch Safe. Buy Confident.",
   description:
     "HEDG: The responsible memecoin launchpad on Solana. Deployer collateral, cross-wallet reputation, and auto refunds.",
@@ -52,6 +53,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "HEDG — Launch Safe. Buy Confident.",
     description: "The responsible memecoin launchpad on Solana.",
+    site: "@hedglol",
     creator: "@hedglol",
     images: ["/images/og.png"],
   },

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import { FEATURES } from "@/lib/features";
 
 const coreFeatures = [
   {
@@ -338,30 +339,36 @@ export default function AboutPage() {
           </Card>
         </section>
 
-        {/* CTA */}
-        <section className="text-center">
-          <div className="arcade-border bg-bg-card p-10">
-            <h2 className="text-lg font-display text-text-primary mb-4">
-              READY TO PLAY?
-            </h2>
-            <p className="text-sm text-text-secondary font-mono mb-8">
-              <span className="text-primary">&gt; </span>
-              Browse live launches or create your own.
-            </p>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <Link href="/floor">
-                <Button variant="primary" size="lg">
-                  [ FLOOR ]
-                </Button>
-              </Link>
-              <Link href="/launch">
-                <Button variant="outline" size="lg">
-                  [ LAUNCH TOKEN ]
-                </Button>
-              </Link>
+        {/* CTA — dropped entirely while both app sections are gated off. */}
+        {(FEATURES.floor || FEATURES.launch) && (
+          <section className="text-center">
+            <div className="arcade-border bg-bg-card p-10">
+              <h2 className="text-lg font-display text-text-primary mb-4">
+                READY TO PLAY?
+              </h2>
+              <p className="text-sm text-text-secondary font-mono mb-8">
+                <span className="text-primary">&gt; </span>
+                Browse live launches or create your own.
+              </p>
+              <div className="flex gap-4 justify-center flex-wrap">
+                {FEATURES.floor && (
+                  <Link href="/floor">
+                    <Button variant="primary" size="lg">
+                      [ FLOOR ]
+                    </Button>
+                  </Link>
+                )}
+                {FEATURES.launch && (
+                  <Link href="/launch">
+                    <Button variant="outline" size="lg">
+                      [ LAUNCH TOKEN ]
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </div>
     </main>
   );

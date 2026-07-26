@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import ComingSoon from "@/components/common/ComingSoon";
 import { fetchLaunches, type ApiToken } from "@/lib/api";
 import { usePressureScores, formatCountdown } from "@/hooks/usePressureScore";
 import { formatSol, formatAddress } from "@/lib/utils";
+import { FEATURES } from "@/lib/features";
 
-export default function BountyPage() {
+function BountyPageInner() {
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -109,4 +111,9 @@ export default function BountyPage() {
       </div>
     </main>
   );
+}
+
+export default function BountyPage() {
+  if (!FEATURES.bounty) return <ComingSoon title="BOUNTY" />;
+  return <BountyPageInner />;
 }

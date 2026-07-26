@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { FEATURES } from "@/lib/features";
 
-const footerLinks = [
+const allFooterLinks = [
   { label: "About", href: "/about" },
   { label: "$HEDG", href: "/hedg-token" },
   { label: "Floor", href: "/floor" },
   { label: "Launch", href: "/launch" },
   { label: "Docs", href: "https://github.com/hedg-lol/hedg#readme" },
 ];
+
+// Gated sections stay out of the footer until their flag is on.
+const footerLinks = allFooterLinks.filter((link) => {
+  if (link.href === "/floor") return FEATURES.floor;
+  if (link.href === "/launch") return FEATURES.launch;
+  return true;
+});
 
 const socialLinks = [
   { label: "X", href: "https://x.com/hedglol" },

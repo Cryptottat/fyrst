@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import ComingSoon from "@/components/common/ComingSoon";
 import { COLLATERAL_TIERS, MIN_COLLATERAL, DEADLINE_PRESETS } from "@/lib/constants";
+import { FEATURES } from "@/lib/features";
 import { getCollateralTier } from "@/lib/utils";
 import { useAnchorProgram, launchToken, launchAndBuy } from "@/lib/anchor";
 import { createLaunch, recordTrade } from "@/lib/api";
@@ -17,7 +19,7 @@ import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
 type LaunchStatus = "idle" | "signing" | "confirming" | "buying" | "recording" | "success" | "error";
 
-export default function LaunchPage() {
+function LaunchPageInner() {
   const router = useRouter();
   const { publicKey, connected } = useWallet();
   const { setVisible } = useWalletModal();
@@ -428,4 +430,9 @@ export default function LaunchPage() {
       </div>
     </main>
   );
+}
+
+export default function LaunchPage() {
+  if (!FEATURES.launch) return <ComingSoon title="LAUNCH" />;
+  return <LaunchPageInner />;
 }

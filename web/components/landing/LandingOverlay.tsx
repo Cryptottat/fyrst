@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { FEATURES } from "@/lib/features";
 
 // ─── Hedgehog accent palette ───
 const H = {
@@ -124,33 +125,52 @@ function HoverCard({
 function CtaButtons() {
   return (
     <div className="flex gap-4 pointer-events-auto">
-      <motion.a
-        href="/launch"
-        className="px-6 py-3 font-display text-sm tracking-wide transition-all"
-        style={{
-          background: H.gold,
-          color: "#0A0A0C",
-          border: `2px solid ${H.gold}`,
-          boxShadow: `inset -3px -3px 0px ${H.brown}, inset 3px 3px 0px ${H.cream}40`,
-        }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        transition={spring}
-      >
-        LAUNCH TOKEN
-      </motion.a>
-      <motion.a
-        href="/floor"
-        className="px-6 py-3 font-display text-sm tracking-wide transition-all"
-        style={{ color: H.cream, ...arcadeCard }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        transition={spring}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = H.gold; e.currentTarget.style.color = H.gold; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = H.border; e.currentTarget.style.color = H.cream; }}
-      >
-        ENTER APP
-      </motion.a>
+      {FEATURES.launch && (
+        <motion.a
+          href="/launch"
+          className="px-6 py-3 font-display text-sm tracking-wide transition-all"
+          style={{
+            background: H.gold,
+            color: "#0A0A0C",
+            border: `2px solid ${H.gold}`,
+            boxShadow: `inset -3px -3px 0px ${H.brown}, inset 3px 3px 0px ${H.cream}40`,
+          }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          transition={spring}
+        >
+          LAUNCH TOKEN
+        </motion.a>
+      )}
+      {FEATURES.floor && (
+        <motion.a
+          href="/floor"
+          className="px-6 py-3 font-display text-sm tracking-wide transition-all"
+          style={{ color: H.cream, ...arcadeCard }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          transition={spring}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = H.gold; e.currentTarget.style.color = H.gold; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = H.border; e.currentTarget.style.color = H.cream; }}
+        >
+          ENTER APP
+        </motion.a>
+      )}
+      {/* Both app sections gated off — keep the row filled so the hero layout holds. */}
+      {!FEATURES.launch && !FEATURES.floor && (
+        <motion.a
+          href="/about"
+          className="px-6 py-3 font-display text-sm tracking-wide transition-all"
+          style={{ color: H.cream, ...arcadeCard }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          transition={spring}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = H.gold; e.currentTarget.style.color = H.gold; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = H.border; e.currentTarget.style.color = H.cream; }}
+        >
+          LEARN MORE
+        </motion.a>
+      )}
     </div>
   );
 }

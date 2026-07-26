@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
+import ComingSoon from "@/components/common/ComingSoon";
 import { fetchLaunches, type ApiToken } from "@/lib/api";
+import { FEATURES } from "@/lib/features";
 import { useAppStore, type PriceSnapshot } from "@/lib/store";
 import {
   formatCompact,
@@ -150,7 +152,7 @@ function TokenCard({ token, index, flash }: { token: ApiToken; index: number; fl
   );
 }
 
-export default function DashboardPage() {
+function DashboardPageInner() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("lastTrade");
   const [loading, setLoading] = useState(true);
@@ -336,4 +338,9 @@ export default function DashboardPage() {
       </div>
     </main>
   );
+}
+
+export default function FloorPage() {
+  if (!FEATURES.floor) return <ComingSoon title="FLOOR" />;
+  return <DashboardPageInner />;
 }

@@ -9,7 +9,9 @@ import ProgressBar from "@/components/ui/ProgressBar";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import BondingCurveChart from "@/components/charts/BondingCurveChart";
 import type { Candle } from "@/components/charts/BondingCurveChart";
+import ComingSoon from "@/components/common/ComingSoon";
 import { fetchToken, fetchDeployer, fetchTrades, fetchComments, postComment, type ApiToken, type ApiDeployer, type ApiComment } from "@/lib/api";
+import { FEATURES } from "@/lib/features";
 import { useRaydiumPrice } from "@/hooks/useRaydiumPrice";
 import { fetchGeckoOHLCV, fetchGeckoTrades, type DexCandle, type DexTrade } from "@/lib/raydium-data";
 import { useAppStore } from "@/lib/store";
@@ -87,7 +89,7 @@ function CountdownTimer({ deadlineTimestamp }: { deadlineTimestamp: string | nul
   return <span>{m}m {String(s).padStart(2, "0")}s</span>;
 }
 
-export default function TokenDetailPage({
+function TokenDetailPageInner({
   params,
 }: {
   params: Promise<{ mint: string }>;
@@ -1528,4 +1530,11 @@ export default function TokenDetailPage({
       />
     </main>
   );
+}
+
+export default function TokenDetailPage(props: {
+  params: Promise<{ mint: string }>;
+}) {
+  if (!FEATURES.floor) return <ComingSoon title="TOKEN" />;
+  return <TokenDetailPageInner {...props} />;
 }
